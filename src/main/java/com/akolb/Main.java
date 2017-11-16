@@ -63,7 +63,7 @@ public class Main {
 
         String server = getServerUri(cmd);
 
-        LOG.info("connecting to {}" + server);
+        LOG.info("connecting to " + server);
 
         List<String> arguments = cmd.getArgList();
         String command = CMD_LIST;
@@ -92,11 +92,13 @@ public class Main {
                         client.getAllDatabases()
                                 .stream()
                                 .filter(n -> n.matches(dbMatcher))
+                                .sorted()
                                 .collect(Collectors.toList());
                     for (String database: databases) {
                         client.getAllTables(database)
                                 .stream()
                                 .filter(n -> n.matches(tableMatcher))
+                                .sorted()
                                 .forEach(n -> {
                                     if (verbose) {
                                         client.displayTable(database, n);
