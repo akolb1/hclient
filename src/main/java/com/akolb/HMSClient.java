@@ -11,6 +11,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,18 +46,22 @@ public class HMSClient implements AutoCloseable {
    * @throws MetaException
    */
   Set<String> getAllDatabases(String filter) throws MetaException {
-    String matcher = filter == null || filter.isEmpty() ? ".*" : filter;
+    if (filter == null || filter.isEmpty()) {
+      return new HashSet<>(client.getAllDatabases());
+    }
     return client.getAllDatabases()
         .stream()
-        .filter(n -> n.matches(matcher))
+        .filter(n -> n.matches(filter))
         .collect(Collectors.toSet());
   }
 
   Set<String> getAllTables(String dbName, String filter) throws MetaException {
-    String matcher = filter == null || filter.isEmpty() ? ".*" : filter;
+    if (filter == null || filter.isEmpty()) {
+      return new HashSet<>(client.getAllTables(dbName));
+    }
     return client.getAllTables(dbName)
         .stream()
-        .filter(n -> n.matches(matcher))
+        .filter(n -> n.matches(filter))
         .collect(Collectors.toSet());
   }
 
