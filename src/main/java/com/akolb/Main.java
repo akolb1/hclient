@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class Main {
     // Default column type
@@ -31,6 +32,8 @@ public class Main {
     private static final String OPT_DATABASE = "database";
     private static final String OPT_TABLE = "table";
     private static final String OPT_DROP = "drop";
+
+    private static final String ENV_SERVER = "HMS_THRIFT_SERVER";
 
 
     public static void main(String[] args) throws Exception {
@@ -52,6 +55,7 @@ public class Main {
         }
 
         String server = getServerUri(cmd);
+        String userName = System.getProperty("user.name");
 
         System.out.println("connecting to " + server);
 
@@ -62,8 +66,14 @@ public class Main {
                 new ArrayList<>(Arrays.asList(partitions));
 
         try (HMSClient client = new HMSClient(server)) {
-            String dbName = cmd.getOptionValue(OPT_DATABASE, DBNAME);
+            String dbName = cmd.getOptionValue(OPT_DATABASE, userName);
             String tableName = cmd.getOptionValue(OPT_TABLE, TBNAME);
+
+            if (tableName.contains(".")) {
+                String[] parts = tableName.split("\\.");
+                dbName = parts[0];
+                tableName = parts[1];
+            }
 
             if (cmd.getArgList().isEmpty()) {
                 Table table = client.getTable(dbName, tableName);
@@ -101,7 +111,13 @@ public class Main {
     }
 
     private static String getServerUri(CommandLine cmd) {
-        String server = cmd.getOptionValue(OPT_SERVER, DEFAULT_HOST);
+        Map<String, String> env = System.getenv();
+        String defaultServer = env.get(ENV_SERVER);
+        if (defaultServer == null) {
+            defaultServer = DEFAULT_HOST;
+        }
+
+        String server = cmd.getOptionValue(OPT_SERVER, defaultServer);
         if (!server.contains(":")) {
             String port = cmd.getOptionValue(OPT_PORT, DEFAULT_PORT);
             server = server + ":" + port;
