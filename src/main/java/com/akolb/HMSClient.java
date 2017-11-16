@@ -33,11 +33,19 @@ public class HMSClient implements AutoCloseable {
   }
 
   boolean dbExists(String dbName) throws MetaException {
-    return has(client.getAllDatabases(), dbName);
+    return has(getAllDatabases(), dbName);
   }
 
   boolean tableExists(String dbName, String tableName) throws MetaException {
-    return has(client.getAllTables(dbName), tableName);
+    return has(getAllTables(dbName), tableName);
+  }
+
+  List<String> getAllDatabases() throws MetaException {
+    return client.getAllDatabases();
+  }
+
+  List<String> getAllTables(String dbName) throws MetaException {
+    return client.getAllTables(dbName);
   }
 
   /**
@@ -94,6 +102,15 @@ public class HMSClient implements AutoCloseable {
     List<FieldSchema> partitions = table.getPartitionKeys();
     for (FieldSchema schema: partitions) {
       System.out.println("\t  " + schema.getName() + ":\t" + schema.getType());
+    }
+  }
+
+  void displayTable(String dbName, String tableName) {
+    try {
+      printTable(getTable(dbName, tableName));
+      System.out.println();
+    } catch (TException e) {
+      System.out.println(dbName + "." + tableName + ": " + e.getMessage());
     }
   }
 

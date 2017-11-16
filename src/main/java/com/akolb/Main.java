@@ -6,15 +6,17 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Table;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class Main {
+    private static Logger LOG = Logger.getLogger(Main.class.getName());
     // Default column type
     private static final String DEFAULT_TYPE = "string";
     private static final String TYPE_SEPARATOR = ":";
@@ -23,8 +25,7 @@ public class Main {
     private static final String THRIFT_PREFIX = "thrift://";
     private static final String DEFAULT_PORT = "9083";
 
-    private static final String DBNAME = "akolb";
-    private static final String TBNAME = "akolb_table";
+    private static final String DBNAME = "default";
 
     private static final String OPT_SERVER = "server";
     private static final String OPT_PORT = "port";
@@ -32,8 +33,13 @@ public class Main {
     private static final String OPT_DATABASE = "database";
     private static final String OPT_TABLE = "table";
     private static final String OPT_DROP = "drop";
+    private static final String OPT_VERBOSE = "verbose";
+
 
     private static final String ENV_SERVER = "HMS_THRIFT_SERVER";
+
+    private static final String CMD_LIST = "list";
+    private static final String CMD_CREATE = "create";
 
 
     public static void main(String[] args) throws Exception {
@@ -44,6 +50,7 @@ public class Main {
                 .addOption("h", "help", false, "print this info")
                 .addOption("d", OPT_DATABASE, true, "database name")
                 .addOption("t", OPT_TABLE, true, "table name")
+                .addOption("v", OPT_VERBOSE, false, "verbose mode")
                 .addOption("D", OPT_DROP, false, "drop table if exists");
 
         CommandLineParser parser = new DefaultParser();
@@ -55,9 +62,18 @@ public class Main {
         }
 
         String server = getServerUri(cmd);
-        String userName = System.getProperty("user.name");
 
-        System.out.println("connecting to " + server);
+        LOG.info("connecting to {}" + server);
+
+        List<String> arguments = cmd.getArgList();
+        String command = CMD_LIST;
+        if (!arguments.isEmpty()) {
+            command = arguments.get(0);
+            arguments = arguments.subList(1, arguments.size());
+        }
+
+        String dbName = cmd.getOptionValue(OPT_DATABASE);
+        String tableName = cmd.getOptionValue(OPT_TABLE);
 
         String partitionsInfo = cmd.getOptionValue(OPT_PARTITIONS);
         String[] partitions = partitionsInfo == null ? null : partitionsInfo.split(",");
@@ -66,41 +82,73 @@ public class Main {
                 new ArrayList<>(Arrays.asList(partitions));
 
         try (HMSClient client = new HMSClient(server)) {
-            String dbName = cmd.getOptionValue(OPT_DATABASE, userName);
-            String tableName = cmd.getOptionValue(OPT_TABLE, TBNAME);
+            switch (command) {
+                case CMD_LIST:
+                    String dbMatcher = dbName == null ? ".*" : dbName;
+                    String tableMatcher = tableName == null ? ".*" : tableName;
+                    boolean verbose = cmd.hasOption(OPT_VERBOSE);
 
-            if (tableName.contains(".")) {
-                String[] parts = tableName.split("\\.");
-                dbName = parts[0];
-                tableName = parts[1];
+                    List<String> databases =
+                        client.getAllDatabases()
+                                .stream()
+                                .filter(n -> n.matches(dbMatcher))
+                                .collect(Collectors.toList());
+                    for (String database: databases) {
+                        client.getAllTables(database)
+                                .stream()
+                                .filter(n -> n.matches(tableMatcher))
+                                .forEach(n -> {
+                                    if (verbose) {
+                                        client.displayTable(database, n);
+                                    } else {
+                                        System.out.println(database + "." + n);
+                                    }
+                                });
+                    }
+                    break;
+
+                case CMD_CREATE:
+                    if (tableName != null && tableName.contains(".")) {
+                        String[] parts = tableName.split("\\.");
+                        dbName = parts[0];
+                        tableName = parts[1];
+                    }
+
+                    if (dbName == null) {
+                        dbName = DBNAME;
+                    }
+
+                    if (tableName == null) {
+                        LOG.warning("Missing table name");
+                        System.exit(1);
+                    }
+
+                    if (!client.dbExists(dbName))
+                        client.createDatabase(dbName);
+                    else {
+                        LOG.warning("Database '" + dbName + "' already exist");
+                    }
+
+                    if (client.tableExists(dbName, tableName)) {
+                        if (cmd.hasOption(OPT_DROP)) {
+                            LOG.info("Dropping existing table '" + tableName + "'");
+                            client.dropTable(dbName, tableName);
+                        } else {
+                            LOG.warning("Table '" + tableName + "' already exist");
+                            break;
+                        }
+                    }
+
+                    client.createTable(client.makeTable(dbName, tableName,
+                            createSchema(arguments),
+                            createSchema(partitionInfo)));
+                    LOG.info("Created table '" + tableName + "'");
+                    client.displayTable(dbName, tableName);
+                    break;
+                default:
+                    LOG.warning("Unknown command '" + command + "'");
+                    System.exit(1);
             }
-
-            if (cmd.getArgList().isEmpty()) {
-                Table table = client.getTable(dbName, tableName);
-                client.printTable(table);
-                return;
-            }
-
-            if (!client.dbExists(dbName))
-                client.createDatabase(dbName);
-            else {
-                System.out.println("Database '" + dbName + "' already exist");
-            }
-
-            if (client.tableExists(dbName, tableName)) {
-                if (cmd.hasOption(OPT_DROP)) {
-                    System.out.println("Dropping existing table '" + tableName + "'");
-                    client.dropTable(dbName, tableName);
-                } else {
-                    System.out.println("Table '" + tableName + "' already exist");
-                    return;
-                }
-            }
-
-            client.createTable(client.makeTable(dbName, tableName,
-                    createSchema(cmd.getArgList()),
-                    createSchema(partitionInfo)));
-            System.out.println("Created table '" + tableName + "'");
         }
     }
 
