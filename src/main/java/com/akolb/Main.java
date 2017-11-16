@@ -34,8 +34,10 @@ public class Main {
     private static final String OPT_TABLE = "table";
     private static final String OPT_DROP = "drop";
     private static final String OPT_VERBOSE = "verbose";
+    private static final String OPT_NUMBER = "number";
+    private static final String OPT_PATTERN = "pattern";
 
-
+    private static final String DEFAULT_PATTERN = "%s_%d";
     private static final String ENV_SERVER = "HMS_THRIFT_SERVER";
 
     private static final String CMD_LIST = "list";
@@ -51,6 +53,8 @@ public class Main {
                 .addOption("d", OPT_DATABASE, true, "database name")
                 .addOption("t", OPT_TABLE, true, "table name")
                 .addOption("v", OPT_VERBOSE, false, "verbose mode")
+                .addOption("N", OPT_NUMBER, true, "number of instances")
+                .addOption("S", OPT_PATTERN, true, "table name pattern")
                 .addOption("D", OPT_DROP, false, "drop table if exists");
 
         CommandLineParser parser = new DefaultParser();
@@ -80,13 +84,13 @@ public class Main {
         List<String> partitionInfo = partitions == null ?
                 Collections.emptyList() :
                 new ArrayList<>(Arrays.asList(partitions));
+        boolean verbose = cmd.hasOption(OPT_VERBOSE);
 
         try (HMSClient client = new HMSClient(server)) {
             switch (command) {
                 case CMD_LIST:
                     String dbMatcher = dbName == null ? ".*" : dbName;
                     String tableMatcher = tableName == null ? ".*" : tableName;
-                    boolean verbose = cmd.hasOption(OPT_VERBOSE);
 
                     List<String> databases =
                         client.getAllDatabases()
@@ -116,6 +120,15 @@ public class Main {
                         tableName = parts[1];
                     }
 
+                    boolean multiple = false;
+                    int nTables = 0;
+                    if (cmd.hasOption(OPT_NUMBER)) {
+                        nTables = Integer.valueOf(cmd.getOptionValue(OPT_NUMBER, "0"));
+                        if (nTables > 0) {
+                            multiple = true;
+                        }
+                    }
+
                     if (dbName == null) {
                         dbName = DBNAME;
                     }
@@ -131,21 +144,44 @@ public class Main {
                         LOG.warning("Database '" + dbName + "' already exist");
                     }
 
-                    if (client.tableExists(dbName, tableName)) {
-                        if (cmd.hasOption(OPT_DROP)) {
-                            LOG.info("Dropping existing table '" + tableName + "'");
-                            client.dropTable(dbName, tableName);
-                        } else {
-                            LOG.warning("Table '" + tableName + "' already exist");
-                            break;
+                    if (!multiple) {
+                        if (client.tableExists(dbName, tableName)) {
+                            if (cmd.hasOption(OPT_DROP)) {
+                                LOG.warning("Dropping existing table '" + tableName + "'");
+                                client.dropTable(dbName, tableName);
+                            } else {
+                                LOG.warning("Table '" + tableName + "' already exist");
+                                break;
+                            }
+                        }
+
+                        client.createTable(client.makeTable(dbName, tableName,
+                                createSchema(arguments),
+                                createSchema(partitionInfo)));
+                        LOG.info("Created table '" + tableName + "'");
+                        client.displayTable(dbName, tableName);
+                    } else {
+                        for (int i = 1; i <= nTables; i++) {
+                            String pattern = cmd.getOptionValue(OPT_PATTERN, DEFAULT_PATTERN);
+                            String tbl = String.format(pattern, tableName, i);
+                            if (client.tableExists(dbName, tbl)) {
+                                if (cmd.hasOption(OPT_DROP)) {
+                                    LOG.warning("Dropping existing table '" + tbl + "'");
+                                    client.dropTable(dbName, tbl);
+                                } else {
+                                    LOG.warning("Table '" + tbl + "' already exist");
+                                    break;
+                                }
+                            }
+
+                            client.createTable(client.makeTable(dbName, tbl,
+                                    createSchema(arguments),
+                                    createSchema(partitionInfo)));
+                            if (verbose) {
+                                client.displayTable(dbName, tbl);
+                            }
                         }
                     }
-
-                    client.createTable(client.makeTable(dbName, tableName,
-                            createSchema(arguments),
-                            createSchema(partitionInfo)));
-                    LOG.info("Created table '" + tableName + "'");
-                    client.displayTable(dbName, tableName);
                     break;
                 default:
                     LOG.warning("Unknown command '" + command + "'");
