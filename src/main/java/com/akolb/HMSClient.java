@@ -12,6 +12,8 @@ import org.apache.thrift.TException;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class HMSClient implements AutoCloseable {
   private static final String METASTORE_URI = "hive.metastore.uris";
@@ -28,24 +30,34 @@ public class HMSClient implements AutoCloseable {
     return new HiveMetaStoreClient(conf);
   }
 
-  private static boolean has(Collection<String> elements, String value) {
-    return elements.stream().anyMatch(n -> n.equalsIgnoreCase(value));
-  }
-
   boolean dbExists(String dbName) throws MetaException {
-    return has(getAllDatabases(), dbName);
+    return getAllDatabases(dbName).contains(dbName);
   }
 
   boolean tableExists(String dbName, String tableName) throws MetaException {
-    return has(getAllTables(dbName), tableName);
+    return getAllTables(dbName, tableName).contains(tableName);
   }
 
-  List<String> getAllDatabases() throws MetaException {
-    return client.getAllDatabases();
+  /**
+   * Return all databases with name matching the filter
+   * @param filter Regexp. Can be null or empty in which case everything matches
+   * @return list of database names matching the filter
+   * @throws MetaException
+   */
+  Set<String> getAllDatabases(String filter) throws MetaException {
+    String matcher = filter == null || filter.isEmpty() ? ".*" : filter;
+    return client.getAllDatabases()
+        .stream()
+        .filter(n -> n.matches(matcher))
+        .collect(Collectors.toSet());
   }
 
-  List<String> getAllTables(String dbName) throws MetaException {
-    return client.getAllTables(dbName);
+  Set<String> getAllTables(String dbName, String filter) throws MetaException {
+    String matcher = filter == null || filter.isEmpty() ? ".*" : filter;
+    return client.getAllTables(dbName)
+        .stream()
+        .filter(n -> n.matches(matcher))
+        .collect(Collectors.toSet());
   }
 
   /**

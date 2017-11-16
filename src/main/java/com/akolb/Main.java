@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -89,27 +90,17 @@ public class Main {
         try (HMSClient client = new HMSClient(server)) {
             switch (command) {
                 case CMD_LIST:
-                    String dbMatcher = dbName == null ? ".*" : dbName;
-                    String tableMatcher = tableName == null ? ".*" : tableName;
-
-                    List<String> databases =
-                        client.getAllDatabases()
-                                .stream()
-                                .filter(n -> n.matches(dbMatcher))
-                                .sorted()
-                                .collect(Collectors.toList());
-                    for (String database: databases) {
-                        client.getAllTables(database)
-                                .stream()
-                                .filter(n -> n.matches(tableMatcher))
-                                .sorted()
-                                .forEach(n -> {
-                                    if (verbose) {
-                                        client.displayTable(database, n);
-                                    } else {
-                                        System.out.println(database + "." + n);
-                                    }
-                                });
+                    for (String database: client.getAllDatabases(dbName)) {
+                        client.getAllTables(database, tableName)
+                            .stream()
+                            .sorted()
+                            .forEach(n -> {
+                                if (verbose) {
+                                    client.displayTable(database, n);
+                                } else {
+                                    System.out.println(database + "." + n);
+                                }
+                            });
                     }
                     break;
 
@@ -161,10 +152,11 @@ public class Main {
                         LOG.info("Created table '" + tableName + "'");
                         client.displayTable(dbName, tableName);
                     } else {
+                        Set<String> tables = client.getAllTables(dbName, null);
                         for (int i = 1; i <= nTables; i++) {
                             String pattern = cmd.getOptionValue(OPT_PATTERN, DEFAULT_PATTERN);
                             String tbl = String.format(pattern, tableName, i);
-                            if (client.tableExists(dbName, tbl)) {
+                            if (tables.contains(tbl)) {
                                 if (cmd.hasOption(OPT_DROP)) {
                                     LOG.warning("Dropping existing table '" + tbl + "'");
                                     client.dropTable(dbName, tbl);
@@ -177,6 +169,7 @@ public class Main {
                             client.createTable(client.makeTable(dbName, tbl,
                                     createSchema(arguments),
                                     createSchema(partitionInfo)));
+                            tables.add(tbl);
                             if (verbose) {
                                 client.displayTable(dbName, tbl);
                             }
