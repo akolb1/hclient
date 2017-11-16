@@ -50,11 +50,11 @@ public class Main {
                 .addOption("p", OPT_PORT, true, "port")
                 .addOption("P", OPT_PARTITIONS, true, "partitions list")
                 .addOption("h", "help", false, "print this info")
-                .addOption("d", OPT_DATABASE, true, "database name")
-                .addOption("t", OPT_TABLE, true, "table name")
+                .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
+                .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
                 .addOption("v", OPT_VERBOSE, false, "verbose mode")
                 .addOption("N", OPT_NUMBER, true, "number of instances")
-                .addOption("S", OPT_PATTERN, true, "table name pattern")
+                .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
                 .addOption("D", OPT_DROP, false, "drop table if exists");
 
         CommandLineParser parser = new DefaultParser();
@@ -192,7 +192,7 @@ public class Main {
 
     private static void help(Options options) {
         HelpFormatter formater = new HelpFormatter();
-        formater.printHelp("hclient <options> [name:type...]", options);
+        formater.printHelp("hclient list|create <options> [name:type...]", options);
         System.exit(0);
     }
 
