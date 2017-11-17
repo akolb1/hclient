@@ -5,6 +5,7 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import java.util.ArrayList;
@@ -22,27 +23,27 @@ public class Main {
     private static final String DEFAULT_TYPE = "string";
     private static final String TYPE_SEPARATOR = ":";
 
-    private static final String DEFAULT_HOST = "localhost";
-    private static final String THRIFT_PREFIX = "thrift://";
-    private static final String DEFAULT_PORT = "9083";
+    static final String DEFAULT_HOST = "localhost";
+    static final String THRIFT_PREFIX = "thrift://";
+    static final String DEFAULT_PORT = "9083";
 
     private static final String DBNAME = "default";
 
-    private static final String OPT_SERVER = "server";
-    private static final String OPT_PORT = "port";
-    private static final String OPT_PARTITIONS = "partitions";
-    private static final String OPT_DATABASE = "database";
-    private static final String OPT_TABLE = "table";
-    private static final String OPT_DROP = "drop";
-    private static final String OPT_VERBOSE = "verbose";
-    private static final String OPT_NUMBER = "number";
-    private static final String OPT_PATTERN = "pattern";
+    static final String OPT_SERVER = "server";
+    static final String OPT_PORT = "port";
+    static final String OPT_PARTITIONS = "partitions";
+    static final String OPT_DATABASE = "database";
+    static final String OPT_TABLE = "table";
+    static final String OPT_DROP = "drop";
+    static final String OPT_VERBOSE = "verbose";
+    static final String OPT_NUMBER = "number";
+    static final String OPT_PATTERN = "pattern";
 
-    private static final String DEFAULT_PATTERN = "%s_%d";
-    private static final String ENV_SERVER = "HMS_THRIFT_SERVER";
+    static final String DEFAULT_PATTERN = "%s_%d";
+    static final String ENV_SERVER = "HMS_THRIFT_SERVER";
 
-    private static final String CMD_LIST = "list";
-    private static final String CMD_CREATE = "create";
+    static final String CMD_LIST = "list";
+    static final String CMD_CREATE = "create";
 
 
     public static void main(String[] args) throws Exception {
@@ -60,7 +61,14 @@ public class Main {
 
         CommandLineParser parser = new DefaultParser();
 
-        CommandLine cmd = parser.parse(options, args);
+        CommandLine cmd = null;
+
+        try {
+            cmd = parser.parse(options, args);
+        } catch (ParseException e) {
+            help(options);
+            System.exit(1);
+        }
 
         if (cmd.hasOption("help")) {
             help(options);
@@ -183,13 +191,13 @@ public class Main {
         }
     }
 
-    private static void help(Options options) {
+    static void help(Options options) {
         HelpFormatter formater = new HelpFormatter();
         formater.printHelp("hclient list|create <options> [name:type...]", options);
         System.exit(0);
     }
 
-    private static String getServerUri(CommandLine cmd) {
+    static String getServerUri(CommandLine cmd) {
         Map<String, String> env = System.getenv();
         String defaultServer = env.get(ENV_SERVER);
         if (defaultServer == null) {
@@ -214,7 +222,7 @@ public class Main {
      *               name:type for non-String types.
      * @return table schema description
      */
-    private static List<FieldSchema> createSchema(List<String> params) {
+    static List<FieldSchema> createSchema(List<String> params) {
         if (params == null || params.isEmpty()) {
             return Collections.emptyList();
         }
