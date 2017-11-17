@@ -6,6 +6,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -17,8 +18,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +50,7 @@ public class Benchmark {
   String tableName;
   List<FieldSchema> tableSchema;
   List<FieldSchema> partitionSchema;
+  Table table;
 
   public static void main(String[] args) throws RunnerException, TException {
 
@@ -129,6 +129,7 @@ public class Benchmark {
     client = new HMSClient(server);
     tableSchema = createSchema(Collections.emptyList());
     partitionSchema = createSchema(Collections.emptyList());
+    table = client.makeTable(dbName, tableName, tableSchema, partitionSchema);
   }
 
   @TearDown
@@ -140,7 +141,7 @@ public class Benchmark {
 
   @org.openjdk.jmh.annotations.Benchmark
   public void createTable() throws TException {
-    client.createTable(client.makeTable(dbName, tableName, tableSchema, partitionSchema));
+    client.createTable(table);
     client.dropTable(dbName, tableName);
   }
 }

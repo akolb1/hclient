@@ -94,7 +94,7 @@ public class HMSClient implements AutoCloseable {
    * @param columns table schema
    * @return Table object
    */
-  Table makeTable(String dbName, String tableName, List<FieldSchema> columns, List<FieldSchema> partitionKeys) {
+  static Table makeTable(String dbName, String tableName, List<FieldSchema> columns, List<FieldSchema> partitionKeys) {
     StorageDescriptor sd = new StorageDescriptor();
     sd.setCols(columns);
     sd.setSerdeInfo(new SerDeInfo());
@@ -108,7 +108,7 @@ public class HMSClient implements AutoCloseable {
     return table;
   }
 
-  void printTable(Table table) {
+  static void printTable(Table table) {
     String dbName = table.getDbName();
     String tableName = table.getTableName();
     List<FieldSchema> columns = table.getSd().getCols();
