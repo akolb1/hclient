@@ -8,6 +8,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -18,7 +19,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -34,7 +34,6 @@ import static com.akolb.Main.OPT_PORT;
 import static com.akolb.Main.OPT_SERVER;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
-import static com.akolb.Main.createSchema;
 import static com.akolb.Main.getServerUri;
 import static com.akolb.Main.help;
 
@@ -115,6 +114,7 @@ public class Benchmark {
         .include(Benchmark.class.getSimpleName())
         .forks(1)
         .verbosity(VerboseMode.NORMAL)
+        .mode(Mode.AverageTime)
         .build();
 
     new Runner(opt).run();
@@ -128,9 +128,7 @@ public class Benchmark {
     String server = env.get(ENV_SERVER);
     System.out.println("Using server " + server + " table '" + dbName + "." + tableName + "'");
     client = new HMSClient(server);
-    tableSchema = createSchema(Collections.emptyList());
-    partitionSchema = createSchema(Collections.emptyList());
-    table = makeTable(dbName, tableName, tableSchema, partitionSchema);
+    table = makeTable(dbName, tableName, null, null);
   }
 
   @TearDown

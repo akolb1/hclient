@@ -6,12 +6,9 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.thrift.TException;
 
-import java.util.Collections;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
 import java.util.logging.Logger;
 
 import static com.akolb.HMSClient.makeTable;
@@ -24,7 +21,6 @@ import static com.akolb.Main.OPT_PORT;
 import static com.akolb.Main.OPT_SERVER;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
-import static com.akolb.Main.createSchema;
 import static com.akolb.Main.getServerUri;
 import static com.akolb.Main.help;
 
@@ -63,7 +59,6 @@ public class HMSBenchmark {
 
     LOG.info("connecting to " + server);
 
-    HMSClient client = new HMSClient(server);
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
 
@@ -82,52 +77,53 @@ public class HMSBenchmark {
 
     LOG.info("Using table '" + dbName + "." + tableName + "'");
 
-    if (!client.dbExists(dbName)) {
-      client.createDatabase(dbName);
-    }
+    try (HMSClient client = new HMSClient(server)) {
 
-    if (client.tableExists(dbName, tableName)) {
-      client.dropTable(dbName, tableName);
-    }
+      if (!client.dbExists(dbName)) {
+        client.createDatabase(dbName);
+      }
 
-    benchmarkTableCreate(client, dbName, tableName);
+      if (client.tableExists(dbName, tableName)) {
+        client.dropTable(dbName, tableName);
+      }
+
+      benchmarkTableCreate(client, dbName, tableName);
+    }
   }
 
-  private static void benchmarkTableCreate(HMSClient client, String dbName, String tableName)
-      throws TException {
-    List<FieldSchema> tableSchema = createSchema(Collections.emptyList());
-    List<FieldSchema> partitionSchema = createSchema(Collections.emptyList());
-    Table table = makeTable(dbName, tableName, tableSchema, partitionSchema);
+  private static void benchmarkTableCreate(final HMSClient client,
+                                           final String dbName, final String tableName) {
+    Table table = makeTable(dbName, tableName, null, null);
 
-    DescriptiveStatistics stats = new DescriptiveStatistics();
-    DescriptiveStatistics delStats = new DescriptiveStatistics();
+    DescriptiveStatistics stats;
+    DescriptiveStatistics delStats;
 
-    System.out.println("Warmup");
-    for (int i = 0; i < 20; i++) {
-      client.createTable(table);
-      client.dropTable(dbName, tableName);
-    }
+    MicroBenchmark bench = new MicroBenchmark();
+    LOG.info("Measuring create table times");
 
-    System.out.println("Starting benchmark");
-    for (int i = 0; i < 100; i++) {
-      long begin = System.nanoTime();
-      client.createTable(table);
-      long end = System.nanoTime();
-      stats.addValue((double)(end - begin));
-      begin = System.nanoTime();
-      client.dropTable(dbName, tableName);
-      end = System.nanoTime();
-      delStats.addValue((double)(end - begin));
-    }
-    System.out.println("Finished benchmark");
+    stats = bench.measure(null,
+        () -> client.createTableNoException(table),
+        () -> client.dropTableNoException(dbName, tableName));
 
-    System.out.printf("Create: Mean: %g, [%g, %g], +/- %g\n",
-        stats.getMean() / 1000000, stats.getMin() / 1000000,
-        stats.getMax() / 1000000,
-        stats.getStandardDeviation() / 1000000);
-    System.out.printf("Delete: Mean: %g, [%g, %g], +/- %g\n",
-        delStats.getMean() / 1000000, delStats.getMin() / 1000000,
-        delStats.getMax() / 1000000,
-        delStats.getStandardDeviation() / 1000000);
+    LOG.info("Measuring delete table times");
+    delStats = bench.measure(
+        () -> client.createTableNoException(table),
+        () ->client.dropTableNoException(dbName, tableName),
+        null);
+
+    long scale = ChronoUnit.MILLIS.getDuration().getNano();
+
+    double createError = stats.getStandardDeviation() / stats.getMean() * 100;
+    double deleteError = delStats.getStandardDeviation() / delStats.getMean() * 100;
+
+    System.out.printf("Create: Mean: %g ms, [%g, %g], +/- %g%% %n",
+        stats.getMean() / scale, stats.getMin() / scale,
+        stats.getMax() / scale,
+        createError);
+
+    System.out.printf("Delete: Mean: %g ms, [%g, %g], +/- %g%% %n",
+        delStats.getMean() / scale, delStats.getMin() / scale,
+        delStats.getMax() / scale,
+        deleteError);
   }
 }

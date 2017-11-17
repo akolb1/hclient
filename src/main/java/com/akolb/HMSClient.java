@@ -10,7 +10,9 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
-import java.util.Collection;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -21,21 +23,21 @@ public class HMSClient implements AutoCloseable {
 
   private final HiveMetaStoreClient client;
 
-  HMSClient(String server) throws MetaException {
+  HMSClient(@Nonnull String server) throws MetaException {
     client = getClient(server);
   }
 
-  private HiveMetaStoreClient getClient(String server) throws MetaException {
+  private HiveMetaStoreClient getClient(@Nonnull String server) throws MetaException {
     HiveConf conf = new HiveConf();
     conf.set(METASTORE_URI, server);
     return new HiveMetaStoreClient(conf);
   }
 
-  boolean dbExists(String dbName) throws MetaException {
+  boolean dbExists(@Nonnull String dbName) throws MetaException {
     return getAllDatabases(dbName).contains(dbName);
   }
 
-  boolean tableExists(String dbName, String tableName) throws MetaException {
+  boolean tableExists(@Nonnull String dbName, @Nonnull String tableName) throws MetaException {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
@@ -45,7 +47,7 @@ public class HMSClient implements AutoCloseable {
    * @return list of database names matching the filter
    * @throws MetaException
    */
-  Set<String> getAllDatabases(String filter) throws MetaException {
+  Set<String> getAllDatabases(@Nullable String filter) throws MetaException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.getAllDatabases());
     }
@@ -55,7 +57,7 @@ public class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
-  Set<String> getAllTables(String dbName, String filter) throws MetaException {
+  Set<String> getAllTables(@Nonnull String dbName, @Nullable String filter) throws MetaException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.getAllTables(dbName));
     }
@@ -69,7 +71,7 @@ public class HMSClient implements AutoCloseable {
    * Create database with th egiven name if it doesn't exist
    * @param name database name
    */
-  void createDatabase(String name) throws TException {
+  void createDatabase(@Nonnull String name) throws TException {
     Database db = new Database();
     db.setName(name);
     client.createDatabase(db);
@@ -79,11 +81,37 @@ public class HMSClient implements AutoCloseable {
     client.createTable(table);
   }
 
-  void dropTable(String dbName, String tableName) throws TException {
+  /**
+   * Create tabe but convert any exception to unchecked {@link RuntimeException}
+   * @param table table to create
+   */
+  void createTableNoException(@Nonnull Table table) {
+    try {
+      client.createTable(table);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  void dropTable(@Nonnull String dbName, @Nonnull String tableName) throws TException {
     client.dropTable(dbName, tableName);
   }
 
-  Table getTable(String dbName, String tableName) throws TException {
+  /**
+   * Drop table but convert any exception to unchecked {@link RuntimeException}.
+   * @param dbName Database name
+   * @param tableName Table name
+   */
+  void dropTableNoException(@Nonnull String dbName, @Nonnull String tableName) {
+    try {
+      client.dropTable(dbName, tableName);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+
+  Table getTable(@Nonnull String dbName, @Nonnull String tableName) throws TException {
     return client.getTable(dbName, tableName);
   }
 
@@ -94,9 +122,15 @@ public class HMSClient implements AutoCloseable {
    * @param columns table schema
    * @return Table object
    */
-  static Table makeTable(String dbName, String tableName, List<FieldSchema> columns, List<FieldSchema> partitionKeys) {
+  static Table makeTable(@Nonnull String dbName, @Nonnull String tableName,
+                         @Nullable List<FieldSchema> columns,
+                         @Nullable List<FieldSchema> partitionKeys) {
     StorageDescriptor sd = new StorageDescriptor();
-    sd.setCols(columns);
+    if (columns == null) {
+      sd.setCols(Collections.emptyList());
+    } else {
+      sd.setCols(columns);
+    }
     sd.setSerdeInfo(new SerDeInfo());
     sd.getSerdeInfo().setName(tableName);
 
@@ -104,11 +138,13 @@ public class HMSClient implements AutoCloseable {
     table.setDbName(dbName);
     table.setTableName(tableName);
     table.setSd(sd);
-    table.setPartitionKeys(partitionKeys);
+    if (partitionKeys != null) {
+      table.setPartitionKeys(partitionKeys);
+    }
     return table;
   }
 
-  static void printTable(Table table) {
+  static void printTable(@Nonnull Table table) {
     String dbName = table.getDbName();
     String tableName = table.getTableName();
     List<FieldSchema> columns = table.getSd().getCols();
@@ -122,7 +158,7 @@ public class HMSClient implements AutoCloseable {
     }
   }
 
-  void displayTable(String dbName, String tableName) {
+  void displayTable(@Nonnull String dbName, @Nonnull String tableName) {
     try {
       printTable(getTable(dbName, tableName));
       System.out.println();
