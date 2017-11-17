@@ -42,11 +42,6 @@ public class MicroBenchmark {
     this.iterations = iterations;
   }
 
-  @FunctionalInterface
-  interface Invokable {
-    void invoke();
-  }
-
   /**
    * Run the benchmark and measure run-time statistics in nanoseconds.<p>
    * Before the run the warm-up phase is executed.
@@ -55,29 +50,29 @@ public class MicroBenchmark {
    * @param post Optional post-test cleanup
    * @return Statistics describing the results. All times are in nanoseconds.
    */
-  public DescriptiveStatistics measure(@Nullable Invokable pre,
-                                       @Nonnull Invokable test,
-                                       @Nullable Invokable post) {
+  public DescriptiveStatistics measure(@Nullable Runnable pre,
+                                       @Nonnull Runnable test,
+                                       @Nullable Runnable post) {
     for (int i = 0; i < warmup; i++) {
       if (pre != null) {
-        pre.invoke();
+        pre.run();
       }
-      test.invoke();
+      test.run();
       if (post != null) {
-        post.invoke();
+        post.run();
       }
     }
     DescriptiveStatistics stats = new DescriptiveStatistics();
     for (int i = 0; i < iterations; i++) {
       if (pre != null) {
-        pre.invoke();
+        pre.run();
       }
       long start = System.nanoTime();
-      test.invoke();
+      test.run();
       long end = System.nanoTime();
       stats.addValue((double)(end - start));
       if (post != null) {
-        post.invoke();
+        post.run();
       }
     }
     return stats;
