@@ -8,16 +8,18 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.hadoop.hive.metastore.api.Table;
 
+import java.io.IOException;
+import java.net.Socket;
 import java.time.temporal.ChronoUnit;
 import java.util.logging.Logger;
 
 import static com.akolb.HMSClient.makeTable;
+import static com.akolb.Main.DEFAULT_PORT;
 import static com.akolb.Main.OPT_DATABASE;
 import static com.akolb.Main.OPT_DROP;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_PORT;
 import static com.akolb.Main.OPT_SERVER;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
@@ -26,11 +28,11 @@ import static com.akolb.Main.help;
 
 public class HMSBenchmark {
   private static Logger LOG = Logger.getLogger(HMSBenchmark.class.getName());
+  private static long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
     options.addOption("s", OPT_SERVER, true, "HMS Server")
-        .addOption("p", OPT_PORT, true, "port")
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
@@ -55,7 +57,7 @@ public class HMSBenchmark {
       help(options);
     }
 
-    String server = getServerUri(cmd);
+    String server = getServerUri(cmd).toString();
 
     LOG.info("connecting to " + server);
 
@@ -87,43 +89,57 @@ public class HMSBenchmark {
         client.dropTable(dbName, tableName);
       }
 
-      benchmarkTableCreate(client, dbName, tableName);
+      LOG.info("Measure network latency");
+      DescriptiveStatistics netStats = benchmarkNetworkLatency(getServerUri(cmd).getHost(),
+          DEFAULT_PORT);
+      benchmarkTableCreate(client, dbName, tableName, netStats.getMean());
     }
   }
 
   private static void benchmarkTableCreate(final HMSClient client,
-                                           final String dbName, final String tableName) {
+                                           final String dbName, final String tableName,
+                                           double latency) {
     Table table = makeTable(dbName, tableName, null, null);
-
-    DescriptiveStatistics stats;
-    DescriptiveStatistics delStats;
 
     MicroBenchmark bench = new MicroBenchmark();
     LOG.info("Measuring create table times");
 
-    stats = bench.measure(null,
+    DescriptiveStatistics stats = bench.measure(null,
         () -> client.createTableNoException(table),
         () -> client.dropTableNoException(dbName, tableName));
 
+    displayStats(stats, "createTable()");
+    System.out.printf("createTable(): %g ms%n", (stats.getMean() - latency) / scale);
+
     LOG.info("Measuring delete table times");
-    delStats = bench.measure(
+    stats = bench.measure(
         () -> client.createTableNoException(table),
         () ->client.dropTableNoException(dbName, tableName),
         null);
+    displayStats(stats, "dropTable()");
+    System.out.printf("dropTable(): %g ms%n", (stats.getMean() - latency) / scale);
+  }
 
-    long scale = ChronoUnit.MILLIS.getDuration().getNano();
+  private static DescriptiveStatistics benchmarkNetworkLatency(final String server, int port) {
+    MicroBenchmark bench = new MicroBenchmark(10, 50);
+    LOG.info("Measuring socket connection times");
 
-    double createError = stats.getStandardDeviation() / stats.getMean() * 100;
-    double deleteError = delStats.getStandardDeviation() / delStats.getMean() * 100;
+    DescriptiveStatistics stats = bench.measure(
+        () -> {
+          try (Socket socket = new Socket(server, port)) {
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        });
+    displayStats(stats, "Connect()");
+    return stats;
+  }
 
-    System.out.printf("Create: Mean: %g ms, [%g, %g], +/- %g%% %n",
+  private static void displayStats(DescriptiveStatistics stats, String name) {
+    double err = stats.getStandardDeviation() / stats.getMean() * 100;
+    System.out.printf("%s: Mean: %g ms, [%g, %g], +/- %g%% %n", name,
         stats.getMean() / scale, stats.getMin() / scale,
         stats.getMax() / scale,
-        createError);
-
-    System.out.printf("Delete: Mean: %g ms, [%g, %g], +/- %g%% %n",
-        delStats.getMean() / scale, delStats.getMin() / scale,
-        delStats.getMax() / scale,
-        deleteError);
+        err);
   }
 }

@@ -30,7 +30,6 @@ import static com.akolb.Main.OPT_DROP;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_PORT;
 import static com.akolb.Main.OPT_SERVER;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
@@ -56,7 +55,6 @@ public class Benchmark {
 
     org.apache.commons.cli.Options options = new org.apache.commons.cli.Options();
     options.addOption("s", OPT_SERVER, true, "HMS Server")
-        .addOption("p", OPT_PORT, true, "port")
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
@@ -80,7 +78,7 @@ public class Benchmark {
       help(options);
     }
 
-    String server = getServerUri(cmd);
+    String server = getServerUri(cmd).toString();
     LOG.info("connecting to " + server);
 
     HMSClient client = new HMSClient(server);

@@ -1,5 +1,6 @@
 package com.akolb;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 import javax.annotation.Nonnull;
@@ -76,5 +77,15 @@ public class MicroBenchmark {
       }
     }
     return stats;
+  }
+
+  /**
+   * Run the benchmark and measure run-time statistics in nanoseconds.<p>
+   * Before the run the warm-up phase is executed. No pre or post operations are executed.
+   * @param test test to measure
+   * @return Statistics describing the results. All times are in nanoseconds.
+   */
+  public DescriptiveStatistics measure(@NonNull Runnable test) {
+    return measure(null, test, null);
   }
 }

@@ -8,6 +8,10 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,13 +28,12 @@ public class Main {
     private static final String TYPE_SEPARATOR = ":";
 
     static final String DEFAULT_HOST = "localhost";
-    static final String THRIFT_PREFIX = "thrift://";
-    static final String DEFAULT_PORT = "9083";
+    static final String THRIFT_SCHEMA = "thrift";
+    static final int DEFAULT_PORT = 9083;
 
     private static final String DBNAME = "default";
 
     static final String OPT_SERVER = "server";
-    static final String OPT_PORT = "port";
     static final String OPT_PARTITIONS = "partitions";
     static final String OPT_DATABASE = "database";
     static final String OPT_TABLE = "table";
@@ -49,7 +52,6 @@ public class Main {
     public static void main(String[] args) throws Exception {
         Options options = new Options();
         options.addOption("s", OPT_SERVER, true, "HMS Server")
-                .addOption("p", OPT_PORT, true, "port")
                 .addOption("P", OPT_PARTITIONS, true, "partitions list")
                 .addOption("h", "help", false, "print this info")
                 .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
@@ -74,7 +76,7 @@ public class Main {
             help(options);
         }
 
-        String server = getServerUri(cmd);
+        String server = getServerUri(cmd).toString();
 
         LOG.info("connecting to " + server);
 
@@ -197,7 +199,7 @@ public class Main {
         System.exit(0);
     }
 
-    static String getServerUri(CommandLine cmd) {
+    static URI getServerUri(CommandLine cmd) {
         Map<String, String> env = System.getenv();
         String defaultServer = env.get(ENV_SERVER);
         if (defaultServer == null) {
@@ -205,15 +207,15 @@ public class Main {
         }
 
         String server = cmd.getOptionValue(OPT_SERVER, defaultServer);
-        if (!server.contains(":")) {
-            String port = cmd.getOptionValue(OPT_PORT, DEFAULT_PORT);
-            server = server + ":" + port;
-        }
-        if (!server.startsWith(THRIFT_PREFIX)) {
-            server = THRIFT_PREFIX + server;
-        }
 
-        return server;
+        try {
+            return new URI(THRIFT_SCHEMA, null, server, DEFAULT_PORT,
+                null,null, null);
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+        return null;
     }
 
     /**
