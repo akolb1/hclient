@@ -1,5 +1,6 @@
 package com.akolb;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -57,6 +58,14 @@ public class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
+  List<String> getAllDatabasesNoException() {
+    try {
+      return client.getAllDatabases();
+    } catch (MetaException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   Set<String> getAllTables(@Nonnull String dbName, @Nullable String filter) throws MetaException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.getAllTables(dbName));
@@ -65,6 +74,14 @@ public class HMSClient implements AutoCloseable {
         .stream()
         .filter(n -> n.matches(filter))
         .collect(Collectors.toSet());
+  }
+
+  List<String> getAllTablesNoException(@NonNull String dbName) {
+    try {
+      return client.getAllTables(dbName);
+    } catch (MetaException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**

@@ -141,4 +141,15 @@ public class Benchmark {
     client.createTable(table);
     client.dropTable(dbName, tableName);
   }
+
+  @org.openjdk.jmh.annotations.Benchmark
+  public void getAllDatabases() throws TException {
+    client.getAllDatabasesNoException();
+  }
+
+  @org.openjdk.jmh.annotations.Benchmark
+  public void getAllTables() throws TException {
+    client.getAllTablesNoException(dbName);
+  }
+
 }

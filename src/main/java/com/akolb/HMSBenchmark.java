@@ -7,6 +7,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.thrift.TException;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -92,7 +93,11 @@ public class HMSBenchmark {
       LOG.info("Measure network latency");
       DescriptiveStatistics netStats = benchmarkNetworkLatency(getServerUri(cmd).getHost(),
           DEFAULT_PORT);
-      benchmarkTableCreate(client, dbName, tableName, netStats.getMean());
+      double latency = netStats.getMean();
+      benchmarkTableCreate(client, dbName, tableName, latency);
+      benchmarkListDatabases(client, latency);
+      benchmarkListTables(client, dbName, latency);
+      benchmarkListTables100(client, dbName, latency);
     }
   }
 
@@ -108,16 +113,14 @@ public class HMSBenchmark {
         () -> client.createTableNoException(table),
         () -> client.dropTableNoException(dbName, tableName));
 
-    displayStats(stats, "createTable()");
-    System.out.printf("createTable(): %g ms%n", (stats.getMean() - latency) / scale);
+    displayStats(stats, "createTable()", latency);
 
     LOG.info("Measuring delete table times");
     stats = bench.measure(
         () -> client.createTableNoException(table),
         () ->client.dropTableNoException(dbName, tableName),
         null);
-    displayStats(stats, "dropTable()");
-    System.out.printf("dropTable(): %g ms%n", (stats.getMean() - latency) / scale);
+    displayStats(stats, "dropTable()", latency);
   }
 
   private static DescriptiveStatistics benchmarkNetworkLatency(final String server, int port) {
@@ -131,14 +134,58 @@ public class HMSBenchmark {
             e.printStackTrace();
           }
         });
-    displayStats(stats, "Connect()");
+    displayStats(stats, "Connect()", 0);
     return stats;
   }
 
-  private static void displayStats(DescriptiveStatistics stats, String name) {
+  private static void benchmarkListDatabases(final HMSClient client, double latency) {
+    MicroBenchmark bench = new MicroBenchmark();
+    LOG.info("Measuring list databases");
+    DescriptiveStatistics stats = bench.measure(client::getAllDatabasesNoException);
+    displayStats(stats, "getAllDatabases", latency);
+  }
+
+  private static void benchmarkListTables(final HMSClient client, final String dbName, double latency) {
+    MicroBenchmark bench = new MicroBenchmark();
+    LOG.info("Measuring list tables");
+    DescriptiveStatistics stats = bench.measure(() -> client.getAllTablesNoException(dbName));
+    displayStats(stats, "getAllTables", latency);
+  }
+
+  private static void benchmarkListTables100(HMSClient client, String dbName, double latency) {
+    // Create a bunch of tables
+    try {
+      for (int i = 0; i < 100; i++) {
+        String tName = "tmp_table_" + i;
+        Table table = makeTable(dbName, tName, null, null);
+        client.createTable(table);
+      }
+      MicroBenchmark bench = new MicroBenchmark();
+      LOG.info("Measuring list tables with 100 tables");
+      DescriptiveStatistics stats = bench.measure(() -> client.getAllTablesNoException(dbName));
+      displayStats(stats, "getAllTables(multiple)", latency);
+    } catch (TException e) {
+      e.printStackTrace();
+      return;
+    } finally {
+      // Cleanup - delete temp tables
+      for (int i = 0; i < 100; i++) {
+        String tName = "tmp_table_" + i;
+        try {
+          client.dropTable(dbName, tName);
+        } catch (TException e) {
+          e.printStackTrace();
+        }
+      }
+    }
+  }
+
+  private static void displayStats(DescriptiveStatistics stats, String name, double latency) {
     double err = stats.getStandardDeviation() / stats.getMean() * 100;
-    System.out.printf("%s: Mean: %g ms, [%g, %g], +/- %g%% %n", name,
-        stats.getMean() / scale, stats.getMin() / scale,
+    System.out.printf("%s: Mean: %g ms, Adjusted: %g ms, [%g, %g], +/- %g%% %n", name,
+        stats.getMean() / scale,
+        (stats.getMean() - latency) / scale,
+        stats.getMin() / scale,
         stats.getMax() / scale,
         err);
   }
