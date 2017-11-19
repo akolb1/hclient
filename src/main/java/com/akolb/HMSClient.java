@@ -132,6 +132,14 @@ public class HMSClient implements AutoCloseable {
     return client.getTable(dbName, tableName);
   }
 
+  Table getTableNoException(@Nonnull String dbName, @Nonnull String tableName){
+    try {
+      return client.getTable(dbName, tableName);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Create Table objects
    * @param dbName database name
