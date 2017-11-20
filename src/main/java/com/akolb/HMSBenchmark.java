@@ -23,7 +23,6 @@ import java.util.logging.Logger;
 import static com.akolb.HMSClient.makeTable;
 import static com.akolb.Main.DEFAULT_PORT;
 import static com.akolb.Main.OPT_DATABASE;
-import static com.akolb.Main.OPT_DROP;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
@@ -88,7 +87,7 @@ public class HMSBenchmark {
 
     boolean filtertests = cmd.hasOption(OPT_PATTERN);
     List<String> patterns = filtertests ?
-        Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")):
+        Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
 
     try (HMSClient client = new HMSClient(server)) {
@@ -103,22 +102,22 @@ public class HMSBenchmark {
 
       MicroBenchmark bench = new MicroBenchmark();
       BenchmarkSuite suite = new BenchmarkSuite();
-      final String hostName =  getServerUri(cmd).getHost();
+      final String hostName = getServerUri(cmd).getHost();
       final String db = dbName;
       final String tbl = tableName;
 
-      suite.add("latency",       () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT));
+      suite.add("latency", () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT));
       suite.add("listDatabases", () -> bench.measure(client::getAllDatabasesNoException));
-      suite.add("listTables",    () -> bench.measure(() -> client.getAllTablesNoException(db)));
+      suite.add("listTables", () -> bench.measure(() -> client.getAllTablesNoException(db)));
       suite.add("listTables100", () -> benchmarkListTables(bench, client, db, 100));
-      suite.add("getTable",      () -> benchmarkGetTable(bench, client, db, tbl));
-      suite.add("createTable",   () -> benchmarkTableCreate(bench, client, db, tbl));
-      suite.add("deleteTable",   () -> benchmarkDeleteCreate(bench, client, db, tbl));
+      suite.add("getTable", () -> benchmarkGetTable(bench, client, db, tbl));
+      suite.add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl));
+      suite.add("deleteTable", () -> benchmarkDeleteCreate(bench, client, db, tbl));
 
       // Run all tests and disolay results
       System.out.printf("%-20s %-6s %-6s %-6s %-6s%n",
           "Operation", "Mean", "Min", "Max", "Err%");
-        suite.runMatching(patterns).forEach(HMSBenchmark::displayStats);
+      suite.runMatching(patterns).forEach(HMSBenchmark::displayStats);
     }
   }
 
@@ -134,9 +133,9 @@ public class HMSBenchmark {
   }
 
   private static DescriptiveStatistics benchmarkDeleteCreate(MicroBenchmark bench,
-                                                            final HMSClient client,
-                                                            final String dbName,
-                                                            final String tableName) {
+                                                             final HMSClient client,
+                                                             final String dbName,
+                                                             final String tableName) {
     Table table = makeTable(dbName, tableName, null, null);
 
     return bench.measure(
@@ -157,8 +156,8 @@ public class HMSBenchmark {
   }
 
   private static DescriptiveStatistics benchmarkGetTable(MicroBenchmark bench,
-                                        final HMSClient client, final String dbName,
-                                        final String tableName) {
+                                                         final HMSClient client, final String dbName,
+                                                         final String tableName) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
 

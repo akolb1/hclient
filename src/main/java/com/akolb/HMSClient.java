@@ -1,14 +1,19 @@
 package com.akolb;
 
+import com.google.common.base.Joiner;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.ql.io.HiveInputFormat;
+import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
+import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.thrift.TException;
 
 import javax.annotation.Nonnull;
@@ -18,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class HMSClient implements AutoCloseable {
   private static final String METASTORE_URI = "hive.metastore.uris";
@@ -44,6 +50,7 @@ public class HMSClient implements AutoCloseable {
 
   /**
    * Return all databases with name matching the filter
+   *
    * @param filter Regexp. Can be null or empty in which case everything matches
    * @return list of database names matching the filter
    * @throws MetaException
@@ -86,6 +93,7 @@ public class HMSClient implements AutoCloseable {
 
   /**
    * Create database with th egiven name if it doesn't exist
+   *
    * @param name database name
    */
   void createDatabase(@Nonnull String name) throws TException {
@@ -100,6 +108,7 @@ public class HMSClient implements AutoCloseable {
 
   /**
    * Create tabe but convert any exception to unchecked {@link RuntimeException}
+   *
    * @param table table to create
    */
   void createTableNoException(@Nonnull Table table) {
@@ -116,7 +125,8 @@ public class HMSClient implements AutoCloseable {
 
   /**
    * Drop table but convert any exception to unchecked {@link RuntimeException}.
-   * @param dbName Database name
+   *
+   * @param dbName    Database name
    * @param tableName Table name
    */
   void dropTableNoException(@Nonnull String dbName, @Nonnull String tableName) {
@@ -132,7 +142,7 @@ public class HMSClient implements AutoCloseable {
     return client.getTable(dbName, tableName);
   }
 
-  Table getTableNoException(@Nonnull String dbName, @Nonnull String tableName){
+  Table getTableNoException(@Nonnull String dbName, @Nonnull String tableName) {
     try {
       return client.getTable(dbName, tableName);
     } catch (TException e) {
@@ -142,14 +152,16 @@ public class HMSClient implements AutoCloseable {
 
   /**
    * Create Table objects
-   * @param dbName database name
+   *
+   * @param dbName    database name
    * @param tableName table name
-   * @param columns table schema
+   * @param columns   table schema
    * @return Table object
    */
-  static Table makeTable(@Nonnull String dbName, @Nonnull String tableName,
-                         @Nullable List<FieldSchema> columns,
-                         @Nullable List<FieldSchema> partitionKeys) {
+  static @Nonnull
+  Table makeTable(@Nonnull String dbName, @Nonnull String tableName,
+                  @Nullable List<FieldSchema> columns,
+                  @Nullable List<FieldSchema> partitionKeys) {
     StorageDescriptor sd = new StorageDescriptor();
     if (columns == null) {
       sd.setCols(Collections.emptyList());
@@ -166,19 +178,59 @@ public class HMSClient implements AutoCloseable {
     if (partitionKeys != null) {
       table.setPartitionKeys(partitionKeys);
     }
+    SerDeInfo serdeInfo = new SerDeInfo();
+    serdeInfo.setSerializationLib(LazySimpleSerDe.class.getName());
+    sd.setSerdeInfo(serdeInfo);
+    sd.setInputFormat(HiveInputFormat.class.getName());
+    sd.setOutputFormat(HiveOutputFormat.class.getName());
+
     return table;
   }
 
-  static void printTable(@Nonnull Table table) {
+  private static @Nonnull
+  Partition makePartition(@Nonnull Table table, @Nonnull List<String> values) throws MetaException {
+    Partition partition = new Partition();
+    List<String> partitionNames = table.getPartitionKeys()
+        .stream()
+        .map(FieldSchema::getName)
+        .collect(Collectors.toList());
+    if (partitionNames.size() != values.size()) {
+      throw new MetaException("Partition values do not match table schema");
+    }
+    List<String> spec = IntStream.range(0, values.size())
+        .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
+        .collect(Collectors.toList());
+
+    partition.setDbName(table.getDbName());
+    partition.setTableName(table.getTableName());
+    partition.setValues(values);
+    partition.setSd(table.getSd().deepCopy());
+    partition.getSd().setLocation(table.getSd().getLocation() + "/" + Joiner.on("/").join(spec));
+    return partition;
+  }
+
+  void createPartition(@Nonnull Table table, @Nonnull List<String> values) throws TException {
+    client.add_partition(makePartition(table, values));
+  }
+
+  void createPartitionNoException(@Nonnull Table table, @Nonnull List<String> values) {
+    try {
+      client.add_partition(makePartition(table, values));
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void printTable(@Nonnull Table table) {
     String dbName = table.getDbName();
     String tableName = table.getTableName();
     List<FieldSchema> columns = table.getSd().getCols();
     System.out.println(dbName + "." + tableName);
-    for (FieldSchema schema: columns) {
+    for (FieldSchema schema : columns) {
       System.out.println("\t" + schema.getName() + ":\t" + schema.getType());
     }
     List<FieldSchema> partitions = table.getPartitionKeys();
-    for (FieldSchema schema: partitions) {
+    for (FieldSchema schema : partitions) {
       System.out.println("\t  " + schema.getName() + ":\t" + schema.getType());
     }
   }
