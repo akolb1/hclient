@@ -1,5 +1,6 @@
 package com.akolb;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -15,6 +16,7 @@ import java.net.Socket;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -45,8 +47,7 @@ public class HMSBenchmark {
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
-        .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
-        .addOption("D", OPT_DROP, false, "drop table if exists");
+        .addOption("S", OPT_PATTERN, true, "test patterns");
 
     CommandLineParser parser = new DefaultParser();
 
@@ -85,6 +86,11 @@ public class HMSBenchmark {
 
     LOG.info("Using table '" + dbName + "." + tableName + "'");
 
+    boolean filtertests = cmd.hasOption(OPT_PATTERN);
+    List<String> patterns = filtertests ?
+        Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")):
+        Collections.emptyList();
+
     try (HMSClient client = new HMSClient(server)) {
 
       if (!client.dbExists(dbName)) {
@@ -95,93 +101,88 @@ public class HMSBenchmark {
         client.dropTable(dbName, tableName);
       }
 
-      System.out.printf("%-20s %-6s %-6s %-6s %-6s %-6s%n",
-          "Operation", "Mean", "Adj", "Min", "Max", "Err%");
+      MicroBenchmark bench = new MicroBenchmark();
+      BenchmarkSuite suite = new BenchmarkSuite();
+      final String hostName =  getServerUri(cmd).getHost();
+      final String db = dbName;
+      final String tbl = tableName;
 
-      DescriptiveStatistics netStats = benchmarkNetworkLatency(getServerUri(cmd).getHost(),
-        DEFAULT_PORT);
-      double latency = netStats.getMean();
-      benchmarkTableCreate(client, dbName, tableName, latency);
-      benchmarkListDatabases(client, latency);
-      benchmarkListTables(client, dbName, latency);
-      benchmarkListTables100(client, dbName, latency);
-      benchmarkGetTable(client, dbName, tableName, latency);
+      suite.add("latency",       () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT));
+      suite.add("listDatabases", () -> bench.measure(client::getAllDatabasesNoException));
+      suite.add("listTables",    () -> bench.measure(() -> client.getAllTablesNoException(db)));
+      suite.add("listTables100", () -> benchmarkListTables(bench, client, db, 100));
+      suite.add("getTable",      () -> benchmarkGetTable(bench, client, db, tbl));
+      suite.add("createTable",   () -> benchmarkTableCreate(bench, client, db, tbl));
+      suite.add("deleteTable",   () -> benchmarkDeleteCreate(bench, client, db, tbl));
+
+      // Run all tests and disolay results
+      System.out.printf("%-20s %-6s %-6s %-6s %-6s%n",
+          "Operation", "Mean", "Min", "Max", "Err%");
+        suite.runMatching(patterns).forEach(HMSBenchmark::displayStats);
     }
   }
 
-  private static void benchmarkTableCreate(final HMSClient client,
-                                           final String dbName, final String tableName,
-                                           double latency) {
+  private static DescriptiveStatistics benchmarkTableCreate(MicroBenchmark bench,
+                                                            final HMSClient client,
+                                                            final String dbName,
+                                                            final String tableName) {
     Table table = makeTable(dbName, tableName, null, null);
 
-    MicroBenchmark bench = new MicroBenchmark();
-
-    DescriptiveStatistics stats = bench.measure(null,
+    return bench.measure(null,
         () -> client.createTableNoException(table),
         () -> client.dropTableNoException(dbName, tableName));
+  }
 
-    displayStats(stats, "createTable", latency);
+  private static DescriptiveStatistics benchmarkDeleteCreate(MicroBenchmark bench,
+                                                            final HMSClient client,
+                                                            final String dbName,
+                                                            final String tableName) {
+    Table table = makeTable(dbName, tableName, null, null);
 
-    stats = bench.measure(
+    return bench.measure(
         () -> client.createTableNoException(table),
         () -> client.dropTableNoException(dbName, tableName),
         null);
-    displayStats(stats, "dropTable", latency);
   }
 
   private static DescriptiveStatistics benchmarkNetworkLatency(final String server, int port) {
     MicroBenchmark bench = new MicroBenchmark(10, 50);
-
-    DescriptiveStatistics stats = bench.measure(
+    return bench.measure(
         () -> {
           try (Socket socket = new Socket(server, port)) {
           } catch (IOException e) {
             e.printStackTrace();
           }
         });
-    displayStats(stats, "Connect", 0);
-    return stats;
   }
 
-  private static void benchmarkListDatabases(final HMSClient client, double latency) {
-    MicroBenchmark bench = new MicroBenchmark();
-    DescriptiveStatistics stats = bench.measure(client::getAllDatabasesNoException);
-    displayStats(stats, "getAllDatabases", latency);
-  }
-
-  private static void benchmarkListTables(final HMSClient client, final String dbName, double latency) {
-    MicroBenchmark bench = new MicroBenchmark();
-    DescriptiveStatistics stats = bench.measure(() -> client.getAllTablesNoException(dbName));
-    displayStats(stats, "getAllTables", latency);
-  }
-
-  private static void benchmarkGetTable(final HMSClient client, final String dbName,
-                                        final String tableName, double latency) {
-    MicroBenchmark bench = new MicroBenchmark();
+  private static DescriptiveStatistics benchmarkGetTable(MicroBenchmark bench,
+                                        final HMSClient client, final String dbName,
+                                        final String tableName) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
 
     Table table = makeTable(dbName, tableName, columns, partitions);
     client.createTableNoException(table);
     try {
-      DescriptiveStatistics stats = bench.measure(() -> client.getTableNoException(dbName, tableName));
-      displayStats(stats, "getTable", latency);
+      return bench.measure(() -> client.getTableNoException(dbName, tableName));
     } finally {
       client.dropTableNoException(dbName, tableName);
     }
   }
 
-  private static void benchmarkListTables100(HMSClient client, String dbName, double latency) {
+  private static DescriptiveStatistics benchmarkListTables(MicroBenchmark bench,
+                                                           HMSClient client,
+                                                           String dbName,
+                                                           int count) {
     // Create a bunch of tables
     String format = "tmp_table_%d";
-    int count = 100;
     try {
       createManyTables(client, count, dbName, format);
-      MicroBenchmark bench = new MicroBenchmark();
-      DescriptiveStatistics stats = bench.measure(() -> client.getAllTablesNoException(dbName));
-      displayStats(stats, "getAllTables." + count, latency);
+      return bench.measure(() -> client.getAllTablesNoException(dbName));
     } catch (TException e) {
       e.printStackTrace();
+      return new DescriptiveStatistics();
     } finally {
       try {
         dropManyTables(client, count, dbName, format);
@@ -210,11 +211,10 @@ public class HMSBenchmark {
     }
   }
 
-  private static void displayStats(DescriptiveStatistics stats, String name, double latency) {
+  private static void displayStats(String name, DescriptiveStatistics stats) {
     double err = stats.getStandardDeviation() / stats.getMean() * 100;
-    System.out.printf("%-20s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n", name,
+    System.out.printf("%-20s %-6.3g %-6.3g %-6.3g %-6.3g%n", name,
         stats.getMean() / scale,
-        (stats.getMean() - latency) / scale,
         stats.getMin() / scale,
         stats.getMax() / scale,
         err);
