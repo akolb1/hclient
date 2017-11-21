@@ -238,4 +238,9 @@ public class HMSClient implements AutoCloseable {
   public void close() throws Exception {
     client.close();
   }
+
+  public boolean dropPartition(String dbName, String tableName, List<String> arguments)
+      throws TException {
+    return client.dropPartition(dbName, tableName, arguments);
+  }
 }

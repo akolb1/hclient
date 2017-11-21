@@ -49,6 +49,7 @@ public class Main {
   private static final String CMD_LIST = "list";
   private static final String CMD_CREATE = "create";
   private static final String CMD_ADD_PART = "addpart";
+  private static final String CMD_DROP = "drop";
 
 
   public static void main(String[] args) throws Exception {
@@ -182,6 +183,19 @@ public class Main {
           addPartition(client, dbName, tableName, arguments);
           break;
 
+        case CMD_DROP:
+          if (dbName == null || dbName.isEmpty()) {
+            System.out.println("Missing database name");
+            System.exit(1);
+          }
+          if (!arguments.isEmpty()) {
+            // Drop partition case
+            client.dropPartition(dbName, tableName, arguments);
+          } else {
+            dropTables(client, dbName, tableName);
+          }
+          break;
+
         default:
           LOG.warning("Unknown command '" + command + "'");
           System.exit(1);
@@ -262,6 +276,16 @@ public class Main {
               System.out.println(database + "." + tblName);
             }
           });
+    }
+  }
+
+  private static void dropTables(HMSClient client, String dbName, String tableName)
+      throws MetaException {
+    for (String database : client.getAllDatabases(dbName)) {
+      client.getAllTables(database, tableName)
+          .stream()
+          .sorted()
+          .forEach(tblName -> client.dropTableNoException(dbName, tblName));
     }
   }
 
