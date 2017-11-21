@@ -11,6 +11,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
+import javax.annotation.Nonnull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -150,7 +151,6 @@ public class Main {
                 createSchema(arguments),
                 createSchema(partitionInfo)));
             LOG.info("Created table '" + tableName + "'");
-            client.displayTable(dbName, tableName);
           } else {
             Set<String> tables = client.getAllTables(dbName, null);
             for (int i = 1; i <= nTables; i++) {
@@ -170,9 +170,6 @@ public class Main {
                   createSchema(arguments),
                   createSchema(partitionInfo)));
               tables.add(tbl);
-              if (verbose) {
-                client.displayTable(dbName, tbl);
-              }
             }
           }
           break;
@@ -194,7 +191,7 @@ public class Main {
 
   static void help(Options options) {
     HelpFormatter formater = new HelpFormatter();
-    formater.printHelp("hclient list|create <options> [name:type...]", options);
+    formater.printHelp("hclient list|create|addpart <options> [name:type...]", options);
     System.exit(0);
   }
 
@@ -249,11 +246,20 @@ public class Main {
       client.getAllTables(database, tableName)
           .stream()
           .sorted()
-          .forEach(n -> {
+          .forEach(tblName -> {
             if (verbose) {
-              client.displayTable(database, n);
+              Table table = client.getTableNoException(database, tblName);
+              displayTableSchema(table);
+              String tableLocation = table.getSd().getLocation() + "/";
+              client.listPartitionsNoException(database, tblName)
+                  .forEach(p -> System.out.println("\t\t" +
+                      p
+                          .getSd()
+                          .getLocation()
+                          .replaceAll(tableLocation, "")));
+              System.out.println();
             } else {
-              System.out.println(database + "." + n);
+              System.out.println(database + "." + tblName);
             }
           });
     }
@@ -272,5 +278,15 @@ public class Main {
 
     Table table = client.getTable(dbName, tableName);
     client.createPartition(table, values);
+  }
+
+  private static void displayTableSchema(Table table) {
+    String dbName = table.getDbName();
+    String tableName = table.getTableName();
+    System.out.println(dbName + "." + tableName);
+    table.getSd().getCols()
+        .forEach(schema -> System.out.println("\t" + schema.getName() + ":\t" + schema.getType()));
+    table.getPartitionKeys()
+        .forEach(schema -> System.out.println("\t  " + schema.getName() + ":\t" + schema.getType()));
   }
 }

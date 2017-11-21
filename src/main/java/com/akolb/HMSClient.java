@@ -221,26 +221,16 @@ public class HMSClient implements AutoCloseable {
     }
   }
 
-  private static void printTable(@Nonnull Table table) {
-    String dbName = table.getDbName();
-    String tableName = table.getTableName();
-    List<FieldSchema> columns = table.getSd().getCols();
-    System.out.println(dbName + "." + tableName);
-    for (FieldSchema schema : columns) {
-      System.out.println("\t" + schema.getName() + ":\t" + schema.getType());
-    }
-    List<FieldSchema> partitions = table.getPartitionKeys();
-    for (FieldSchema schema : partitions) {
-      System.out.println("\t  " + schema.getName() + ":\t" + schema.getType());
-    }
+  List<Partition> listPartitions(String dbName, String tableName) throws TException {
+    return client.listPartitions(dbName, tableName, (short)-1);
   }
 
-  void displayTable(@Nonnull String dbName, @Nonnull String tableName) {
+  List<Partition> listPartitionsNoException(String dbName, String tableName) {
     try {
-      printTable(getTable(dbName, tableName));
-      System.out.println();
+      return client.listPartitions(dbName, tableName, (short)-1);
     } catch (TException e) {
-      System.out.println(dbName + "." + tableName + ": " + e.getMessage());
+      e.printStackTrace();
+      throw new RuntimeException(e);
     }
   }
 
