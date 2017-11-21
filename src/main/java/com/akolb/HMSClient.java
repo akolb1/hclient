@@ -187,15 +187,15 @@ public class HMSClient implements AutoCloseable {
     return table;
   }
 
-  private static @Nonnull
-  Partition makePartition(@Nonnull Table table, @Nonnull List<String> values) throws MetaException {
+  static @Nonnull
+  Partition makePartition(@Nonnull Table table, @Nonnull List<String> values) {
     Partition partition = new Partition();
     List<String> partitionNames = table.getPartitionKeys()
         .stream()
         .map(FieldSchema::getName)
         .collect(Collectors.toList());
     if (partitionNames.size() != values.size()) {
-      throw new MetaException("Partition values do not match table schema");
+      throw new RuntimeException("Partition values do not match table schema");
     }
     List<String> spec = IntStream.range(0, values.size())
         .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
@@ -216,6 +216,14 @@ public class HMSClient implements AutoCloseable {
   void createPartitionNoException(@Nonnull Table table, @Nonnull List<String> values) {
     try {
       client.add_partition(makePartition(table, values));
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  void createPartitionNoException(@Nonnull Partition partition) {
+    try {
+      client.add_partition(partition);
     } catch (TException e) {
       throw new RuntimeException(e);
     }
@@ -242,5 +250,12 @@ public class HMSClient implements AutoCloseable {
   public boolean dropPartition(String dbName, String tableName, List<String> arguments)
       throws TException {
     return client.dropPartition(dbName, tableName, arguments);
+  }
+  public boolean dropPartitionNoException(String dbName, String tableName, List<String> arguments) {
+    try {
+      return client.dropPartition(dbName, tableName, arguments);
+    } catch (TException e) {
+      throw  new RuntimeException(e);
+    }
   }
 }

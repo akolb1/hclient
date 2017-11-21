@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 /**
  * Run a set of benchmarks as a suite.
@@ -14,13 +15,17 @@ import java.util.function.Supplier;
  * or only ones matching the filter.
  */
 public class BenchmarkSuite {
+  private static Logger LOG = Logger.getLogger(BenchmarkSuite.class.getName());
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new TreeMap<>();
 
   public static Map<String, DescriptiveStatistics> runAll(@Nonnull Map<String,
       Supplier<DescriptiveStatistics>> suite) {
     Map<String, DescriptiveStatistics> result = new TreeMap<>();
-    suite.forEach((k, v) -> result.put(k, v.get()));
+    suite.forEach((k, v) -> {
+      LOG.info("Running benchmark " + k);
+      result.put(k, v.get());
+    });
     return result;
   }
 
@@ -30,7 +35,10 @@ public class BenchmarkSuite {
     suite.keySet()
         .stream()
         .filter(s -> matches(s, patterns))
-        .forEach(k -> result.put(k, suite.get(k).get()));
+        .forEach(k -> {
+          LOG.info("Running benchmark " + k);
+          result.put(k, suite.get(k).get());
+        });
     return result;
   }
 

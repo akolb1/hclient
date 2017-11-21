@@ -8,6 +8,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import static com.akolb.HMSClient.makeTable;
@@ -106,18 +108,22 @@ public class HMSBenchmark {
       final String db = dbName;
       final String tbl = tableName;
 
-      suite.add("latency", () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT));
+      suite.add("latency",       () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT));
       suite.add("listDatabases", () -> bench.measure(client::getAllDatabasesNoException));
-      suite.add("listTables", () -> bench.measure(() -> client.getAllTablesNoException(db)));
+      suite.add("listTables",    () -> bench.measure(() -> client.getAllTablesNoException(db)));
       suite.add("listTables100", () -> benchmarkListTables(bench, client, db, 100));
-      suite.add("getTable", () -> benchmarkGetTable(bench, client, db, tbl));
-      suite.add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl));
-      suite.add("deleteTable", () -> benchmarkDeleteCreate(bench, client, db, tbl));
+      suite.add("getTable",      () -> benchmarkGetTable(bench, client, db, tbl));
+      suite.add("createTable",   () -> benchmarkTableCreate(bench, client, db, tbl));
+      suite.add("deleteTable",   () -> benchmarkDeleteCreate(bench, client, db, tbl));
+      suite.add("addPartition",  () -> benchmarkCreatePartition(bench, client, db, tbl));
+      suite.add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl));
+      suite.add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl));
 
       // Run all tests and disolay results
+      Map<String, DescriptiveStatistics> results = suite.runMatching(patterns);
       System.out.printf("%-20s %-6s %-6s %-6s %-6s%n",
           "Operation", "Mean", "Min", "Max", "Err%");
-      suite.runMatching(patterns).forEach(HMSBenchmark::displayStats);
+      results.forEach(HMSBenchmark::displayStats);
     }
   }
 
@@ -188,6 +194,77 @@ public class HMSBenchmark {
       } catch (TException e) {
         e.printStackTrace();
       }
+    }
+  }
+
+  private static DescriptiveStatistics benchmarkCreatePartition(MicroBenchmark bench,
+                                                                final HMSClient client,
+                                                                final String dbName,
+                                                                final String tableName) {
+    List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name:string")));
+    List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date")));
+    List<String> values = Collections.singletonList("d1");
+
+    Table table = makeTable(dbName, tableName, columns, partitions);
+    client.createTableNoException(table);
+    try {
+      Table t = client.getTable(dbName, tableName);
+      Partition partition = client.makePartition(t, values);
+      return bench.measure(null,
+          () -> client.createPartitionNoException(partition),
+          () -> client.dropPartitionNoException(dbName, tableName, values));
+    } catch (TException e) {
+      e.printStackTrace();
+      return new DescriptiveStatistics();
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
+  private static DescriptiveStatistics benchmarkListPartition(MicroBenchmark bench,
+                                                                final HMSClient client,
+                                                                final String dbName,
+                                                                final String tableName) {
+    List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name:string")));
+    List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date")));
+    List<String> values = Collections.singletonList("d1");
+
+    Table table = makeTable(dbName, tableName, columns, partitions);
+    client.createTableNoException(table);
+    try {
+      Table t = client.getTable(dbName, tableName);
+      Partition partition = client.makePartition(t, values);
+      client.createPartitionNoException(partition);
+      return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
+    } catch (TException e) {
+      e.printStackTrace();
+      return new DescriptiveStatistics();
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
+  private static DescriptiveStatistics benchmarkDropPartition(MicroBenchmark bench,
+                                                                final HMSClient client,
+                                                                final String dbName,
+                                                                final String tableName) {
+    List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name:string")));
+    List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date")));
+    List<String> values = Collections.singletonList("d1");
+
+    Table table = makeTable(dbName, tableName, columns, partitions);
+    client.createTableNoException(table);
+    try {
+      Table t = client.getTable(dbName, tableName);
+      Partition partition = HMSClient.makePartition(t, values);
+      return bench.measure(() -> client.createPartitionNoException(partition),
+          () -> client.dropPartitionNoException(dbName, tableName, values),
+          null);
+    } catch (TException e) {
+      e.printStackTrace();
+      return new DescriptiveStatistics();
+    } finally {
+      client.dropTableNoException(dbName, tableName);
     }
   }
 
