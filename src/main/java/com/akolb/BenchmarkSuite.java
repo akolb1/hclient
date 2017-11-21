@@ -52,8 +52,9 @@ public class BenchmarkSuite {
         runMatching(suite, patterns);
   }
 
-  public void add(@Nonnull String name, @Nonnull Supplier<DescriptiveStatistics> b) {
+  public BenchmarkSuite add(@Nonnull String name, @Nonnull Supplier<DescriptiveStatistics> b) {
     suite.put(name, b);
+    return this;
   }
 
   private static boolean matches(@Nonnull String what, @Nonnull List<String> patterns) {

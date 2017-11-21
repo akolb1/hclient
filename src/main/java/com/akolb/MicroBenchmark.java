@@ -22,15 +22,17 @@ import javax.annotation.Nullable;
 public class MicroBenchmark {
   private static final int WARMUP_DEFAULT = 15;
   private static final int ITERATIONS_DEFAULT = 100;
+  private static final int SCALE_DEFAULT = 1;
   
   private final int warmup;
   private final int iterations;
+  private final int scaleFactor;
 
   /**
    * Create default micro benchmark measurer
    */
   public MicroBenchmark() {
-    this(WARMUP_DEFAULT, ITERATIONS_DEFAULT);
+    this(WARMUP_DEFAULT, ITERATIONS_DEFAULT, SCALE_DEFAULT);
   }
 
   /**
@@ -39,8 +41,20 @@ public class MicroBenchmark {
    * @param iterations number of test calls for measurement
    */
   public MicroBenchmark(int warmup, int iterations) {
+    this(warmup, iterations, SCALE_DEFAULT);
+  }
+
+  /**
+   * Create micro benchmark measurer.
+   *
+   * @param warmup number of test calls for warmup
+   * @param iterations number of test calls for measurement
+   * @param scaleFactor Every delta is divided by scale factor
+   */
+  public MicroBenchmark(int warmup, int iterations, int scaleFactor) {
     this.warmup = warmup;
     this.iterations = iterations;
+    this.scaleFactor = scaleFactor;
   }
 
   /**
@@ -54,6 +68,7 @@ public class MicroBenchmark {
   public DescriptiveStatistics measure(@Nullable Runnable pre,
                                        @Nonnull Runnable test,
                                        @Nullable Runnable post) {
+    // Warmup phase
     for (int i = 0; i < warmup; i++) {
       if (pre != null) {
         pre.run();
@@ -63,6 +78,7 @@ public class MicroBenchmark {
         post.run();
       }
     }
+    // Run the benchmark
     DescriptiveStatistics stats = new DescriptiveStatistics();
     for (int i = 0; i < iterations; i++) {
       if (pre != null) {
@@ -71,7 +87,7 @@ public class MicroBenchmark {
       long start = System.nanoTime();
       test.run();
       long end = System.nanoTime();
-      stats.addValue((double)(end - start));
+      stats.addValue((double)(end - start) / scaleFactor);
       if (post != null) {
         post.run();
       }
