@@ -1,5 +1,6 @@
 package com.akolb;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -12,6 +13,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.Socket;
 import java.time.temporal.ChronoUnit;
@@ -21,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.akolb.HMSClient.makeTable;
@@ -40,6 +44,8 @@ public class HMSBenchmark {
   private static Logger LOG = Logger.getLogger(HMSBenchmark.class.getName());
   private static long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
+  private static final String OPT_SEPARATOR = "separator";
+
   public static void main(String[] args) throws Exception {
     Options options = new Options();
     options.addOption("s", OPT_SERVER, true, "HMS Server")
@@ -49,6 +55,7 @@ public class HMSBenchmark {
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
+        .addOption("K", OPT_SEPARATOR, true, "field separator")
         .addOption("S", OPT_PATTERN, true, "test patterns");
 
     CommandLineParser parser = new DefaultParser();
@@ -109,10 +116,12 @@ public class HMSBenchmark {
       final String db = dbName;
       final String tbl = tableName;
 
-      int instances = Integer.valueOf(cmd.getOptionValue(OPT_NUMBER, "100"));
+      int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
+
+      LOG.info("Using " + instances + " object instances");
 
       displayStats(suite
-          .add("0latency0",       () -> benchmarkNetworkLatency(hostName, DEFAULT_PORT))
+          .add("0-latency-0",   () -> benchmarkNetworkLatency(bench, hostName, DEFAULT_PORT))
           .add("listDatabases", () -> bench.measure(client::getAllDatabasesNoException))
           .add("listTables",    () -> bench.measure(() -> client.getAllTablesNoException(db)))
           .add("listTablesN",   () -> benchmarkListTables(bench, client, db, instances))
@@ -123,7 +132,7 @@ public class HMSBenchmark {
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
           .add("listPartitions",() -> benchmarkListManyPartition(client, db, tbl, instances))
-          .runMatching(patterns));
+          .runMatching(patterns), cmd.getOptionValue(OPT_SEPARATOR));
     }
   }
 
@@ -150,8 +159,8 @@ public class HMSBenchmark {
         null);
   }
 
-  private static DescriptiveStatistics benchmarkNetworkLatency(final String server, int port) {
-    MicroBenchmark bench = new MicroBenchmark(10, 90);
+  private static DescriptiveStatistics benchmarkNetworkLatency(MicroBenchmark bench,
+                                                               final String server, int port) {
     return bench.measure(
         () -> {
           try (Socket socket = new Socket(server, port)) {
@@ -162,13 +171,10 @@ public class HMSBenchmark {
   }
 
   private static DescriptiveStatistics benchmarkGetTable(MicroBenchmark bench,
-                                                         final HMSClient client, final String dbName,
+                                                         final HMSClient client,
+                                                         final String dbName,
                                                          final String tableName) {
-    List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
-    List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
-
-    Table table = makeTable(dbName, tableName, columns, partitions);
-    client.createTableNoException(table);
+    createPartitionedTable(client, dbName, tableName);
     try {
       return bench.measure(() -> client.getTableNoException(dbName, tableName));
     } finally {
@@ -197,12 +203,8 @@ public class HMSBenchmark {
                                                                 final HMSClient client,
                                                                 final String dbName,
                                                                 final String tableName) {
-    List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name:string")));
-    List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date")));
-    List<String> values = Collections.singletonList("d1");
-
-    Table table = makeTable(dbName, tableName, columns, partitions);
-    client.createTableNoException(table);
+    createPartitionedTable(client, dbName, tableName);
+    final List<String> values = Collections.singletonList("d1");
     try {
       Table t = client.getTable(dbName, tableName);
       Partition partition = HMSClient.makePartition(t, values);
@@ -222,7 +224,6 @@ public class HMSBenchmark {
                                                               final String dbName,
                                                               final String tableName) {
     createPartitionedTable(client, dbName, tableName);
-    final List<String> values = Collections.singletonList("d1");
     try {
       createManyPartitions(client, client.getTable(dbName, tableName), 1);
       return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
@@ -239,7 +240,6 @@ public class HMSBenchmark {
                                                                   final String tableName,
                                                                   int howMany) {
     createPartitionedTable(client, dbName, tableName);
-    final List<String> values = Collections.singletonList("d1");
     MicroBenchmark bench = new MicroBenchmark(15, 100, 1);
     try {
       createManyPartitions(client, client.getTable(dbName, tableName), howMany);
@@ -295,14 +295,6 @@ public class HMSBenchmark {
                 Collections.singletonList(String.valueOf(i)))));
   }
 
-  private static void dropManyPartitions(HMSClient client, final String dbName,
-                                         final String tableName, int howMany) {
-    IntStream.range(0, howMany)
-        .forEach(i ->
-            client.dropPartitionNoException(dbName, tableName,
-                Collections.singletonList(String.valueOf(i))));
-  }
-
   // Create a simple table with a single column and single partition
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
     client.createTableNoException(makeTable(dbName, tableName,
@@ -310,19 +302,42 @@ public class HMSBenchmark {
         createSchema(Collections.singletonList("date"))));
   }
 
-  private static void displayStats(Map<String, DescriptiveStatistics> stats) {
-    System.out.printf("%-20s %-6s %-6s %-6s %-6s%n",
-        "Operation", "Mean", "Min", "Max", "Err%");
-    stats.forEach(HMSBenchmark::displayStats);
+  private static void displayStats(Map<String, DescriptiveStatistics> stats,
+                                   @Nullable String separator) {
+    if (separator != null && !separator.isEmpty()) {
+      System.out.println(Joiner.on(separator).join(Lists.newArrayList(Arrays.asList(
+          "Operation",
+          "Mean",
+          "Max",
+          "Err%"))));
+      stats.forEach((name, value) -> displaySeparatedStats(name, value, separator));
+    } else {
+      System.out.printf("%-20s %-6s %-6s %-6s %-6s%n",
+          "Operation", "Mean", "Min", "Max", "Err%");
+      stats.forEach(HMSBenchmark::displayStats);
+    }
   }
 
 
   private static void displayStats(String name, DescriptiveStatistics stats) {
     double err = stats.getStandardDeviation() / stats.getMean() * 100;
-    System.out.printf("%-20s %-6.3g %-6.3g %-6.3g %-6.3g%n", name,
+    System.out.printf("%-20s %-6.3g %-6.3g %-6.3g %-6.3g%n",
+        name,
         stats.getMean() / scale,
         stats.getMin() / scale,
         stats.getMax() / scale,
         err);
   }
+
+  private static void displaySeparatedStats(String name, DescriptiveStatistics stats,
+                                   @Nonnull String separator) {
+    double err = stats.getStandardDeviation() / stats.getMean() * 100;
+    System.out.println(Joiner.on(separator).join(Lists.newArrayList(Arrays.asList(
+            name,
+            String.format("%g", stats.getMean()),
+            String.format("%g", stats.getMin()),
+            String.format("%g", stats.getMax()),
+            String.format("%g", err)))));
+  }
+
 }
