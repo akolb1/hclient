@@ -11,7 +11,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 
-import javax.annotation.Nonnull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -180,7 +179,12 @@ public class Main {
             dbName = parts[0];
             tableName = parts[1];
           }
-          addPartition(client, dbName, tableName, arguments);
+          if (cmd.hasOption(OPT_NUMBER)) {
+            int nPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
+            client.addManyPartitions(dbName, tableName, arguments, nPartitions);
+          } else {
+            addPartition(client, dbName, tableName, arguments);
+          }
           break;
 
         case CMD_DROP:

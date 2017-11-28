@@ -213,12 +213,8 @@ public class HMSClient implements AutoCloseable {
     client.add_partition(makePartition(table, values));
   }
 
-  void createPartitionNoException(@Nonnull Table table, @Nonnull List<String> values) {
-    try {
-      client.add_partition(makePartition(table, values));
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
+  void createPartitions(List<Partition> partitions) throws TException {
+    client.add_partitions( partitions);
   }
 
   void createPartitionNoException(@Nonnull Partition partition) {
@@ -240,6 +236,19 @@ public class HMSClient implements AutoCloseable {
       e.printStackTrace();
       throw new RuntimeException(e);
     }
+  }
+
+  void addManyPartitions(String dbName, String tableName,
+                         List<String> arguments, int nPartitions) throws TException {
+    Table table = client.getTable(dbName, tableName);
+    createPartitions(
+        IntStream.range(0, nPartitions)
+            .mapToObj(i ->
+                makePartition(table,
+                    arguments.stream()
+                        .map(a -> a + i)
+                        .collect(Collectors.toList())))
+            .collect(Collectors.toList()));
   }
 
   @Override

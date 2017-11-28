@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.akolb.HMSClient.makeTable;
@@ -45,6 +44,8 @@ public class HMSBenchmark {
   private static long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
   private static final String OPT_SEPARATOR = "separator";
+  private static final String OPT_SPIN = "spin";
+  private static final String OPT_WARM = "warm";
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
@@ -56,6 +57,8 @@ public class HMSBenchmark {
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("K", OPT_SEPARATOR, true, "field separator")
+        .addOption("L", OPT_SPIN, true, "spin count")
+        .addOption("W", OPT_WARM, true, "warmup count")
         .addOption("S", OPT_PATTERN, true, "test patterns");
 
     CommandLineParser parser = new DefaultParser();
@@ -110,13 +113,17 @@ public class HMSBenchmark {
         client.dropTable(dbName, tableName);
       }
 
-      MicroBenchmark bench = new MicroBenchmark();
+      int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
+      int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
+      int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
+      LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
+          " spin " + spin);
+
+      MicroBenchmark bench = new MicroBenchmark(warmup, spin);
       BenchmarkSuite suite = new BenchmarkSuite();
       final String hostName = getServerUri(cmd).getHost();
       final String db = dbName;
       final String tbl = tableName;
-
-      int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
 
       LOG.info("Using " + instances + " object instances");
 
@@ -131,7 +138,7 @@ public class HMSBenchmark {
           .add("addPartition",  () -> benchmarkCreatePartition(bench, client, db, tbl))
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
-          .add("listPartitions",() -> benchmarkListManyPartition(client, db, tbl, instances))
+          .add("listPartitions",() -> benchmarkListManyPartitions(bench, client, db, tbl, instances))
           .runMatching(patterns), cmd.getOptionValue(OPT_SEPARATOR));
     }
   }
@@ -225,7 +232,9 @@ public class HMSBenchmark {
                                                               final String tableName) {
     createPartitionedTable(client, dbName, tableName);
     try {
-      createManyPartitions(client, client.getTable(dbName, tableName), 1);
+      client.addManyPartitions(dbName, tableName,
+          Collections.singletonList("d"), 1);
+
       return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
     } catch (TException e) {
       e.printStackTrace();
@@ -235,14 +244,22 @@ public class HMSBenchmark {
     }
   }
 
-  private static DescriptiveStatistics benchmarkListManyPartition(final HMSClient client,
-                                                                  final String dbName,
-                                                                  final String tableName,
-                                                                  int howMany) {
+  private static DescriptiveStatistics benchmarkListManyPartitions(MicroBenchmark bench,
+                                                                   final HMSClient client,
+                                                                   final String dbName,
+                                                                   final String tableName,
+                                                                   int howMany) {
     createPartitionedTable(client, dbName, tableName);
-    MicroBenchmark bench = new MicroBenchmark(15, 100, 1);
     try {
-      createManyPartitions(client, client.getTable(dbName, tableName), howMany);
+      client.addManyPartitions(dbName, tableName,
+          Collections.singletonList("d"), howMany);
+      LOG.info("Created " + howMany + " partitions");
+      LOG.info("starting benchmark... ");
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+      }
+      LOG.info("started benchmark... ");
       return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
     } catch (TException e) {
       e.printStackTrace();
@@ -288,13 +305,6 @@ public class HMSBenchmark {
             client.dropTableNoException(dbName, String.format(format, i)));
   }
 
-  private static void createManyPartitions(HMSClient client, Table table, int howMany) {
-    IntStream.range(0, howMany)
-        .forEach(i ->
-            client.createPartitionNoException(HMSClient.makePartition(table,
-                Collections.singletonList(String.valueOf(i)))));
-  }
-
   // Create a simple table with a single column and single partition
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
     client.createTableNoException(makeTable(dbName, tableName,
@@ -305,7 +315,7 @@ public class HMSBenchmark {
   private static void displayStats(Map<String, DescriptiveStatistics> stats,
                                    @Nullable String separator) {
     if (separator != null && !separator.isEmpty()) {
-      System.out.println(Joiner.on(separator).join(Lists.newArrayList(Arrays.asList(
+      System.out.println(Joiner.on(separator).join(new ArrayList<>(Arrays.asList(
           "Operation",
           "Mean",
           "Max",
@@ -332,7 +342,7 @@ public class HMSBenchmark {
   private static void displaySeparatedStats(String name, DescriptiveStatistics stats,
                                    @Nonnull String separator) {
     double err = stats.getStandardDeviation() / stats.getMean() * 100;
-    System.out.println(Joiner.on(separator).join(Lists.newArrayList(Arrays.asList(
+    System.out.println(Joiner.on(separator).join(new ArrayList<>(Arrays.asList(
             name,
             String.format("%g", stats.getMean()),
             String.format("%g", stats.getMin()),
