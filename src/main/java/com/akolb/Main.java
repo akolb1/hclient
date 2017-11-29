@@ -10,6 +10,8 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -19,16 +21,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 public class Main {
-  private static Logger LOG = Logger.getLogger(Main.class.getName());
+  private static Logger LOG = LoggerFactory.getLogger(Main.class.getName());
   // Default column type
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
 
-  static final String DEFAULT_HOST = "localhost";
-  static final String THRIFT_SCHEMA = "thrift";
+  private static final String DEFAULT_HOST = "localhost";
+  private static final String THRIFT_SCHEMA = "thrift";
   static final int DEFAULT_PORT = 9083;
 
   private static final String DBNAME = "default";
@@ -126,23 +127,23 @@ public class Main {
           }
 
           if (tableName == null) {
-            LOG.warning("Missing table name");
+            LOG.warn("Missing table name");
             System.exit(1);
           }
 
           if (!client.dbExists(dbName)) {
             client.createDatabase(dbName);
           } else {
-            LOG.warning("Database '" + dbName + "' already exist");
+            LOG.warn("Database '" + dbName + "' already exist");
           }
 
           if (!multiple) {
             if (client.tableExists(dbName, tableName)) {
               if (cmd.hasOption(OPT_DROP)) {
-                LOG.warning("Dropping existing table '" + tableName + "'");
+                LOG.warn("Dropping existing table '" + tableName + "'");
                 client.dropTable(dbName, tableName);
               } else {
-                LOG.warning("Table '" + tableName + "' already exist");
+                LOG.warn("Table '" + tableName + "' already exist");
                 break;
               }
             }
@@ -158,10 +159,10 @@ public class Main {
               String tbl = String.format(pattern, tableName, i);
               if (tables.contains(tbl)) {
                 if (cmd.hasOption(OPT_DROP)) {
-                  LOG.warning("Dropping existing table '" + tbl + "'");
+                  LOG.warn("Dropping existing table '" + tbl + "'");
                   client.dropTable(dbName, tbl);
                 } else {
-                  LOG.warning("Table '" + tbl + "' already exist");
+                  LOG.warn("Table '" + tbl + "' already exist");
                   break;
                 }
               }
@@ -201,7 +202,7 @@ public class Main {
           break;
 
         default:
-          LOG.warning("Unknown command '" + command + "'");
+          LOG.warn("Unknown command '" + command + "'");
           System.exit(1);
       }
     }

@@ -18,10 +18,11 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import static com.akolb.HMSClient.makeTable;
 import static com.akolb.Main.ENV_SERVER;
@@ -38,7 +39,7 @@ import static com.akolb.Main.help;
 
 @State(Scope.Thread)
 public class Benchmark {
-  private static Logger LOG = Logger.getLogger(Main.class.getName());
+  private static Logger LOG = LoggerFactory.getLogger(Main.class.getName());
 
   private static final String ENV_DB = "HMS_BENCH_DB";
   private static final String ENV_TABLE = "HMS_BENCH_TABLE";
@@ -79,7 +80,7 @@ public class Benchmark {
     }
 
     String server = getServerUri(cmd).toString();
-    LOG.info("connecting to " + server);
+    LOG.info("connecting to {}", server);
 
     HMSClient client = new HMSClient(server);
     String dbName = cmd.getOptionValue(OPT_DATABASE);
@@ -98,7 +99,7 @@ public class Benchmark {
       throw new RuntimeException("Missing Table name");
     }
 
-    LOG.info("Using table '" + dbName + "." + tableName + "'");
+    LOG.info("Using table '{}.{}'", dbName, tableName);
 
     if (!client.dbExists(dbName)) {
       client.createDatabase(dbName);

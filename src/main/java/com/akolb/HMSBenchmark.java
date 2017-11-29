@@ -12,6 +12,8 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -23,7 +25,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
 import static com.akolb.HMSClient.makeTable;
@@ -40,7 +41,7 @@ import static com.akolb.Main.getServerUri;
 import static com.akolb.Main.help;
 
 public class HMSBenchmark {
-  private static Logger LOG = Logger.getLogger(HMSBenchmark.class.getName());
+  private static Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class.getName());
   private static long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
   private static final String OPT_SEPARATOR = "separator";
@@ -78,7 +79,7 @@ public class HMSBenchmark {
 
     String server = getServerUri(cmd).toString();
 
-    LOG.info("connecting to " + server);
+    LOG.info("connecting to {}", server);
 
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
@@ -96,7 +97,7 @@ public class HMSBenchmark {
       throw new RuntimeException("Missing Table name");
     }
 
-    LOG.info("Using table '" + dbName + "." + tableName + "'");
+    LOG.info("Using table '{}.{}", dbName, tableName);
 
     boolean filtertests = cmd.hasOption(OPT_PATTERN);
     List<String> patterns = filtertests ?
@@ -125,7 +126,7 @@ public class HMSBenchmark {
       final String db = dbName;
       final String tbl = tableName;
 
-      LOG.info("Using " + instances + " object instances");
+      LOG.info("Using {} object instances", instances);
 
       displayStats(suite
           .add("0-latency-0",   () -> benchmarkNetworkLatency(bench, hostName, DEFAULT_PORT))
@@ -253,7 +254,7 @@ public class HMSBenchmark {
     try {
       client.addManyPartitions(dbName, tableName,
           Collections.singletonList("d"), howMany);
-      LOG.info("Created " + howMany + " partitions");
+      LOG.info("Created {} partitions", howMany);
       LOG.info("starting benchmark... ");
       try {
         Thread.sleep(1000);

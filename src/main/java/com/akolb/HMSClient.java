@@ -168,8 +168,12 @@ public class HMSClient implements AutoCloseable {
     } else {
       sd.setCols(columns);
     }
-    sd.setSerdeInfo(new SerDeInfo());
-    sd.getSerdeInfo().setName(tableName);
+    SerDeInfo serdeInfo = new SerDeInfo();
+    serdeInfo.setSerializationLib(LazySimpleSerDe.class.getName());
+    serdeInfo.setName(tableName);
+    sd.setSerdeInfo(serdeInfo);
+    sd.setInputFormat(HiveInputFormat.class.getName());
+    sd.setOutputFormat(HiveOutputFormat.class.getName());
 
     Table table = new Table();
     table.setDbName(dbName);
@@ -178,11 +182,6 @@ public class HMSClient implements AutoCloseable {
     if (partitionKeys != null) {
       table.setPartitionKeys(partitionKeys);
     }
-    SerDeInfo serdeInfo = new SerDeInfo();
-    serdeInfo.setSerializationLib(LazySimpleSerDe.class.getName());
-    sd.setSerdeInfo(serdeInfo);
-    sd.setInputFormat(HiveInputFormat.class.getName());
-    sd.setOutputFormat(HiveOutputFormat.class.getName());
 
     return table;
   }
