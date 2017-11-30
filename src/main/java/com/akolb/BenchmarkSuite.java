@@ -5,10 +5,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Run a set of benchmarks as a suite.
@@ -18,22 +22,36 @@ import java.util.function.Supplier;
 public class BenchmarkSuite {
   private static Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class.getName());
   // Collection of benchmarks
-  private final Map<String, Supplier<DescriptiveStatistics>> suite = new TreeMap<>();
+  private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
+  // List of benchmarks. All benchmarks are executed in the order
+  // they are inserted
+  private final List<String> benchmarks = new ArrayList<>();
 
-  public static Map<String, DescriptiveStatistics> runAll(@Nonnull Map<String,
-      Supplier<DescriptiveStatistics>> suite) {
+  public List<String> list(@Nullable List<String> patterns) {
+    if (patterns == null || patterns.isEmpty()) {
+      return benchmarks;
+    }
+    return benchmarks
+        .stream()
+        .filter(s -> matches(s, patterns))
+        .collect(Collectors.toList());
+  }
+
+  public Map<String, DescriptiveStatistics> runAll() {
     Map<String, DescriptiveStatistics> result = new TreeMap<>();
-    suite.forEach((k, v) -> {
-      LOG.info("Running benchmark {}", k);
-      result.put(k, v.get());
+    benchmarks.forEach(name -> {
+      LOG.info("Running benchmark {}", name);
+      result.put(name, suite.get(name).get());
     });
     return result;
   }
 
-  public static Map<String, DescriptiveStatistics> runMatching(@Nonnull Map<String,
-      Supplier<DescriptiveStatistics>> suite, @Nonnull List<String> patterns) {
+  public Map<String, DescriptiveStatistics> runMatching(@Nullable List<String> patterns) {
+    if (patterns == null || patterns.isEmpty()) {
+      return runAll();
+    }
     Map<String, DescriptiveStatistics> result = new TreeMap<>();
-    suite.keySet()
+    benchmarks
         .stream()
         .filter(s -> matches(s, patterns))
         .forEach(k -> {
@@ -43,18 +61,9 @@ public class BenchmarkSuite {
     return result;
   }
 
-  public @Nonnull Map<String, DescriptiveStatistics> runAll() {
-    return runAll(suite);
-  }
-
-  public @Nonnull Map<String, DescriptiveStatistics> runMatching(List<String> patterns) {
-    return patterns == null || patterns.isEmpty() ?
-        runAll(suite) :
-        runMatching(suite, patterns);
-  }
-
   public BenchmarkSuite add(@Nonnull String name, @Nonnull Supplier<DescriptiveStatistics> b) {
     suite.put(name, b);
+    benchmarks.add(name);
     return this;
   }
 

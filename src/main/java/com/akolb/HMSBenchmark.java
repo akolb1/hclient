@@ -47,6 +47,7 @@ public class HMSBenchmark {
   private static final String OPT_SEPARATOR = "separator";
   private static final String OPT_SPIN = "spin";
   private static final String OPT_WARM = "warm";
+  private static final String OPT_LIST = "list";
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
@@ -60,6 +61,7 @@ public class HMSBenchmark {
         .addOption("K", OPT_SEPARATOR, true, "field separator")
         .addOption("L", OPT_SPIN, true, "spin count")
         .addOption("W", OPT_WARM, true, "warmup count")
+        .addOption("l", OPT_LIST, true, "list benchmarks")
         .addOption("S", OPT_PATTERN, true, "test patterns");
 
     CommandLineParser parser = new DefaultParser();
