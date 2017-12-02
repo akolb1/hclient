@@ -33,12 +33,21 @@ import static com.akolb.Main.OPT_DATABASE;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_SERVER;
+import static com.akolb.Main.OPT_HOST;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Main.createSchema;
 import static com.akolb.Main.getServerUri;
 import static com.akolb.Main.help;
+
+/*
+ * TODO Compute median
+ * TODO support sanitizing data
+ * TODO support saving raw data to files
+ * TODO support CSV output
+ * TODO support saving results to file
+ * TODO sync options with python version
+ */
 
 public class HMSBenchmark {
   private static Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class.getName());
@@ -51,7 +60,7 @@ public class HMSBenchmark {
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
-    options.addOption("s", OPT_SERVER, true, "HMS Server")
+    options.addOption("s", OPT_HOST, true, "HMS Server")
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")

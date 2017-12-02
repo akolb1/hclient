@@ -34,7 +34,7 @@ public class Main {
 
   private static final String DBNAME = "default";
 
-  static final String OPT_SERVER = "server";
+  static final String OPT_HOST = "server";
   static final String OPT_PARTITIONS = "partitions";
   static final String OPT_DATABASE = "database";
   static final String OPT_TABLE = "table";
@@ -54,7 +54,7 @@ public class Main {
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
-    options.addOption("s", OPT_SERVER, true, "HMS Server")
+    options.addOption("H", OPT_HOST, true, "HMS Server")
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
@@ -221,7 +221,7 @@ public class Main {
       defaultServer = DEFAULT_HOST;
     }
 
-    String server = cmd.getOptionValue(OPT_SERVER, defaultServer);
+    String server = cmd.getOptionValue(OPT_HOST, defaultServer);
 
     try {
       return new URI(THRIFT_SCHEMA, null, server, DEFAULT_PORT,

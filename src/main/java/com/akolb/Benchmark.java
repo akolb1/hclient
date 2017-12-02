@@ -31,7 +31,7 @@ import static com.akolb.Main.OPT_DROP;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_SERVER;
+import static com.akolb.Main.OPT_HOST;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Main.getServerUri;
@@ -55,7 +55,7 @@ public class Benchmark {
   public static void main(String[] args) throws RunnerException, TException {
 
     org.apache.commons.cli.Options options = new org.apache.commons.cli.Options();
-    options.addOption("s", OPT_SERVER, true, "HMS Server")
+    options.addOption("s", OPT_HOST, true, "HMS Server")
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
