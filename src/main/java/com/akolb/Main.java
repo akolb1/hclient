@@ -1,5 +1,6 @@
 package com.akolb;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -42,6 +43,8 @@ public class Main {
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
   static final String OPT_PATTERN = "pattern";
+  private static final String OPT_KERBEROS = "kerberos";
+  private static final String OPT_KEYTAB = "keytab";
 
   static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
@@ -62,6 +65,8 @@ public class Main {
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
+        .addOption("K", OPT_KERBEROS, true, "Kerberos principal")
+        .addOption("T", OPT_KEYTAB, true, "Kerberos keytab")
         .addOption("D", OPT_DROP, false, "drop table if exists");
 
     CommandLineParser parser = new DefaultParser();
@@ -99,8 +104,16 @@ public class Main {
         Collections.emptyList() :
         new ArrayList<>(Arrays.asList(partitions));
     boolean verbose = cmd.hasOption(OPT_VERBOSE);
+    String principal = null;
+    String keytab = null;
+    if (cmd.hasOption(OPT_KERBEROS)) {
+      LOG.info("Using Kerberos");
+      Preconditions.checkNotNull(cmd.getOptionValue(OPT_KEYTAB));
+      principal = cmd.getOptionValue(OPT_KERBEROS);
+      keytab = Preconditions.checkNotNull(cmd.getOptionValue(OPT_KEYTAB));
+    }
 
-    try (HMSClient client = new HMSClient(server)) {
+    try (HMSClient client = new HMSClient(server, principal, keytab)) {
       switch (command) {
         case CMD_LIST:
           displayTables(client, dbName, tableName, verbose);
