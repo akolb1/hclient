@@ -83,8 +83,10 @@ public class HMSClient implements AutoCloseable {
     LOG.debug("Opening kerberos connection to HMS using kerberos principal {}, serverPrincipal {}",
         principal, serverPrincipal);
     String[] principalParts = SaslRpcServer.splitKerberosName(serverPrincipal);
+    /*
     Preconditions.checkArgument(principalParts.length == 3,
         "Kerberos principal %s should have 3 parts", principal);
+    */
     File keytabFile = new File(keytab);
     Preconditions.checkState(keytabFile.isFile() && keytabFile.canRead(),
         "Keytab %s does not exist or is not readable", keytab);
@@ -98,7 +100,9 @@ public class HMSClient implements AutoCloseable {
       loginContext = new LoginContext("", subject, null, kerberosConfig);
       loginContext.login();
     } catch (LoginException e) {
-      throw new MetaException("Can't login via kerberos");
+      LOG.info("failed to login with subject {}", subject);
+      e.printStackTrace();
+      throw new MetaException("Can't login via kerberos: " +  e.getMessage());
     }
     subject = loginContext.getSubject();
     conf.set("hadoop.security.authentication", "kerberos");
