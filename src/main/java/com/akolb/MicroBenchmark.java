@@ -1,10 +1,8 @@
 package com.akolb;
 
-import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Micro-benchmark some piece of code.<p>
@@ -19,7 +17,7 @@ import javax.annotation.Nullable;
  * number of times the warmup and measurement is repeated.<p>
  * All time is measured in nanoseconds.
  */
-public class MicroBenchmark {
+class MicroBenchmark {
   private static final int WARMUP_DEFAULT = 15;
   private static final int ITERATIONS_DEFAULT = 100;
   private static final int SCALE_DEFAULT = 1;
@@ -40,7 +38,7 @@ public class MicroBenchmark {
    * @param warmup number of test calls for warmup
    * @param iterations number of test calls for measurement
    */
-  public MicroBenchmark(int warmup, int iterations) {
+  MicroBenchmark(int warmup, int iterations) {
     this(warmup, iterations, SCALE_DEFAULT);
   }
 
@@ -51,7 +49,7 @@ public class MicroBenchmark {
    * @param iterations number of test calls for measurement
    * @param scaleFactor Every delta is divided by scale factor
    */
-  public MicroBenchmark(int warmup, int iterations, int scaleFactor) {
+  private MicroBenchmark(int warmup, int iterations, int scaleFactor) {
     this.warmup = warmup;
     this.iterations = iterations;
     this.scaleFactor = scaleFactor;
@@ -66,7 +64,7 @@ public class MicroBenchmark {
    * @return Statistics describing the results. All times are in nanoseconds.
    */
   public DescriptiveStatistics measure(@Nullable Runnable pre,
-                                       @Nonnull Runnable test,
+                                       @NotNull Runnable test,
                                        @Nullable Runnable post) {
     // Warmup phase
     for (int i = 0; i < warmup; i++) {
@@ -101,7 +99,7 @@ public class MicroBenchmark {
    * @param test test to measure
    * @return Statistics describing the results. All times are in nanoseconds.
    */
-  public DescriptiveStatistics measure(@NonNull Runnable test) {
+  public DescriptiveStatistics measure(@NotNull Runnable test) {
     return measure(null, test, null);
   }
 }

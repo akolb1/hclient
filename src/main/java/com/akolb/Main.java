@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class Main {
-  private static Logger LOG = LoggerFactory.getLogger(Main.class.getName());
+class Main {
+  private static final Logger LOG = LoggerFactory.getLogger(Main.class.getName());
   // Default column type
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
@@ -46,7 +46,7 @@ public class Main {
   private static final String OPT_KERBEROS = "kerberos";
   private static final String OPT_KEYTAB = "keytab";
 
-  static final String DEFAULT_PATTERN = "%s_%d";
+  private static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
 
   private static final String CMD_LIST = "list";
@@ -161,7 +161,7 @@ public class Main {
               }
             }
 
-            client.createTable(client.makeTable(dbName, tableName,
+            client.createTable(HMSClient.makeTable(dbName, tableName,
                 createSchema(arguments),
                 createSchema(partitionInfo)));
             LOG.info("Created table '" + tableName + "'");
@@ -180,7 +180,7 @@ public class Main {
                 }
               }
 
-              client.createTable(client.makeTable(dbName, tbl,
+              client.createTable(HMSClient.makeTable(dbName, tbl,
                   createSchema(arguments),
                   createSchema(partitionInfo)));
               tables.add(tbl);

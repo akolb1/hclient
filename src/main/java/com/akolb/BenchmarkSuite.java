@@ -1,11 +1,11 @@
 package com.akolb;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * or only ones matching the filter.
  */
 public class BenchmarkSuite {
-  private static Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class.getName());
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
   // List of benchmarks. All benchmarks are executed in the order
@@ -37,7 +37,7 @@ public class BenchmarkSuite {
         .collect(Collectors.toList());
   }
 
-  public Map<String, DescriptiveStatistics> runAll() {
+  private Map<String, DescriptiveStatistics> runAll() {
     Map<String, DescriptiveStatistics> result = new TreeMap<>();
     benchmarks.forEach(name -> {
       LOG.info("Running benchmark {}", name);
@@ -61,13 +61,13 @@ public class BenchmarkSuite {
     return result;
   }
 
-  public BenchmarkSuite add(@Nonnull String name, @Nonnull Supplier<DescriptiveStatistics> b) {
+  public BenchmarkSuite add(@NotNull String name, @NotNull Supplier<DescriptiveStatistics> b) {
     suite.put(name, b);
     benchmarks.add(name);
     return this;
   }
 
-  private static boolean matches(@Nonnull String what, @Nonnull List<String> patterns) {
+  private static boolean matches(@NotNull String what, @NotNull List<String> patterns) {
     return patterns.stream().anyMatch(what::matches);
   }
 }

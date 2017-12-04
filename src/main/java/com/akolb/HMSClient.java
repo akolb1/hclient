@@ -19,11 +19,11 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.login.AppConfigurationEntry;
@@ -41,23 +41,23 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class HMSClient implements AutoCloseable {
-  private static Logger LOG = LoggerFactory.getLogger(HMSClient.class.getName());
+class HMSClient implements AutoCloseable {
+  private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class.getName());
   private static final String METASTORE_URI = "hive.metastore.uris";
 
   private final HiveMetaStoreClient client;
   private LoginContext loginContext;
 
-  HMSClient(@Nonnull String server) throws MetaException, IOException, InterruptedException {
+  HMSClient(@NotNull String server) throws MetaException, IOException, InterruptedException {
     client = getClient(server);
   }
 
-  HMSClient(@Nonnull String server, @Nullable String principal, @Nullable String keytab)
+  HMSClient(@NotNull String server, @Nullable String principal, @Nullable String keytab)
       throws MetaException, IOException, InterruptedException {
     client = getClient(server, principal, keytab);
   }
 
-  private HiveMetaStoreClient getClient(@Nonnull String server) throws MetaException,
+  private HiveMetaStoreClient getClient(@NotNull String server) throws MetaException,
       IOException, InterruptedException {
     return getClient(server, null, null);
   }
@@ -74,7 +74,7 @@ public class HMSClient implements AutoCloseable {
    * @throws IOException          if fails connecting to metastore
    * @throws InterruptedException if interrupted during kerberos setup
    */
-  private HiveMetaStoreClient getClient(@Nonnull String server, @Nullable String principal,
+  private HiveMetaStoreClient getClient(@NotNull String server, @Nullable String principal,
                                         @Nullable String keyTab)
       throws MetaException, IOException, InterruptedException {
     HiveConf conf = new HiveConf();
@@ -86,11 +86,11 @@ public class HMSClient implements AutoCloseable {
         Preconditions.checkNotNull(keyTab));
   }
 
-  boolean dbExists(@Nonnull String dbName) throws MetaException {
+  boolean dbExists(@NotNull String dbName) throws MetaException {
     return getAllDatabases(dbName).contains(dbName);
   }
 
-  boolean tableExists(@Nonnull String dbName, @Nonnull String tableName) throws MetaException {
+  boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws MetaException {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
@@ -119,7 +119,7 @@ public class HMSClient implements AutoCloseable {
     }
   }
 
-  Set<String> getAllTables(@Nonnull String dbName, @Nullable String filter) throws MetaException {
+  Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws MetaException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.getAllTables(dbName));
     }
@@ -129,7 +129,7 @@ public class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
-  List<String> getAllTablesNoException(@Nonnull String dbName) {
+  List<String> getAllTablesNoException(@NotNull String dbName) {
     try {
       return client.getAllTables(dbName);
     } catch (MetaException e) {
@@ -142,7 +142,7 @@ public class HMSClient implements AutoCloseable {
    *
    * @param name database name
    */
-  void createDatabase(@Nonnull String name) throws TException {
+  void createDatabase(@NotNull String name) throws TException {
     Database db = new Database();
     db.setName(name);
     client.createDatabase(db);
@@ -157,7 +157,7 @@ public class HMSClient implements AutoCloseable {
    *
    * @param table table to create
    */
-  void createTableNoException(@Nonnull Table table) {
+  void createTableNoException(@NotNull Table table) {
     try {
       client.createTable(table);
     } catch (TException e) {
@@ -165,7 +165,7 @@ public class HMSClient implements AutoCloseable {
     }
   }
 
-  void dropTable(@Nonnull String dbName, @Nonnull String tableName) throws TException {
+  void dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     client.dropTable(dbName, tableName);
   }
 
@@ -175,7 +175,7 @@ public class HMSClient implements AutoCloseable {
    * @param dbName    Database name
    * @param tableName Table name
    */
-  void dropTableNoException(@Nonnull String dbName, @Nonnull String tableName) {
+  void dropTableNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
       client.dropTable(dbName, tableName);
     } catch (TException e) {
@@ -184,11 +184,11 @@ public class HMSClient implements AutoCloseable {
   }
 
 
-  Table getTable(@Nonnull String dbName, @Nonnull String tableName) throws TException {
+  Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     return client.getTable(dbName, tableName);
   }
 
-  Table getTableNoException(@Nonnull String dbName, @Nonnull String tableName) {
+  Table getTableNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
       return client.getTable(dbName, tableName);
     } catch (TException e) {
@@ -204,8 +204,8 @@ public class HMSClient implements AutoCloseable {
    * @param columns   table schema
    * @return Table object
    */
-  static @Nonnull
-  Table makeTable(@Nonnull String dbName, @Nonnull String tableName,
+  static @NotNull
+  Table makeTable(@NotNull String dbName, @NotNull String tableName,
                   @Nullable List<FieldSchema> columns,
                   @Nullable List<FieldSchema> partitionKeys) {
     StorageDescriptor sd = new StorageDescriptor();
@@ -232,8 +232,8 @@ public class HMSClient implements AutoCloseable {
     return table;
   }
 
-  static @Nonnull
-  Partition makePartition(@Nonnull Table table, @Nonnull List<String> values) {
+  static @NotNull
+  Partition makePartition(@NotNull Table table, @NotNull List<String> values) {
     Partition partition = new Partition();
     List<String> partitionNames = table.getPartitionKeys()
         .stream()
@@ -254,15 +254,15 @@ public class HMSClient implements AutoCloseable {
     return partition;
   }
 
-  void createPartition(@Nonnull Table table, @Nonnull List<String> values) throws TException {
+  void createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
     client.add_partition(makePartition(table, values));
   }
 
-  void createPartitions(List<Partition> partitions) throws TException {
+  private void createPartitions(List<Partition> partitions) throws TException {
     client.add_partitions(partitions);
   }
 
-  void createPartitionNoException(@Nonnull Partition partition) {
+  void createPartitionNoException(@NotNull Partition partition) {
     try {
       client.add_partition(partition);
     } catch (TException e) {
@@ -322,8 +322,8 @@ public class HMSClient implements AutoCloseable {
    * Borrowed from Sentry KerberosConfiguration.java
    */
   private HiveMetaStoreClient getKerberosClient(HiveConf conf,
-                                                @Nonnull String principal,
-                                                @Nonnull String keytab) throws IOException,
+                                                @NotNull String principal,
+                                                @NotNull String keytab) throws IOException,
       MetaException, InterruptedException {
     String host = "localhost";
     int port = 1234;
@@ -356,21 +356,17 @@ public class HMSClient implements AutoCloseable {
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation clientUGI =
         UserGroupInformation.getUGIFromSubject(subject);
-    return clientUGI.doAs(new PrivilegedExceptionAction<HiveMetaStoreClient>() {
-      @Override
-      public HiveMetaStoreClient run() throws MetaException {
-        return new HiveMetaStoreClient(conf);
-      }
-    });
+    return clientUGI.doAs((PrivilegedExceptionAction<HiveMetaStoreClient>)
+        () -> new HiveMetaStoreClient(conf));
   }
 
 
   private static class KerberosConfiguration extends javax.security.auth.login.Configuration {
     private static final String KRBCNAME = "KRB5CCNAME";
 
-    private String principal;
-    private String keytab;
-    private boolean isInitiator;
+    private final String principal;
+    private final String keytab;
+    private final boolean isInitiator;
     private static final boolean IBM_JAVA = System.getProperty("java.vendor").contains("IBM");
 
     private KerberosConfiguration(String principal, File keytab,
@@ -380,8 +376,8 @@ public class HMSClient implements AutoCloseable {
       this.isInitiator = client;
     }
 
-    public static javax.security.auth.login.Configuration createClientConfig(String principal,
-                                                                             File keytab) {
+    static javax.security.auth.login.Configuration createClientConfig(String principal,
+                                                                      File keytab) {
       return new KerberosConfiguration(principal, keytab, true);
     }
 

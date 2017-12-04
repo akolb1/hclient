@@ -12,11 +12,11 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.Socket;
 import java.time.temporal.ChronoUnit;
@@ -49,9 +49,9 @@ import static com.akolb.Main.help;
  * TODO sync options with python version
  */
 
-public class HMSBenchmark {
-  private static Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class.getName());
-  private static long scale = ChronoUnit.MILLIS.getDuration().getNano();
+class HMSBenchmark {
+  private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class.getName());
+  private static final long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
   private static final String OPT_SEPARATOR = "separator";
   private static final String OPT_SPIN = "spin";
@@ -182,9 +182,10 @@ public class HMSBenchmark {
                                                                final String server, int port) {
     return bench.measure(
         () -> {
+          //noinspection EmptyTryBlock
           try (Socket socket = new Socket(server, port)) {
           } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("socket connection failed", e);
           }
         });
   }
@@ -210,9 +211,6 @@ public class HMSBenchmark {
     try {
       createManyTables(client, count, dbName, format);
       return bench.measure(() -> client.getAllTablesNoException(dbName));
-    } catch (TException e) {
-      e.printStackTrace();
-      return new DescriptiveStatistics();
     } finally {
         dropManyTables(client, count, dbName, format);
     }
@@ -301,8 +299,7 @@ public class HMSBenchmark {
     }
   }
 
-  private static void createManyTables(HMSClient client, int howMany, String dbName, String format)
-      throws TException {
+  private static void createManyTables(HMSClient client, int howMany, String dbName, String format) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
     IntStream.range(0, howMany)
@@ -352,7 +349,7 @@ public class HMSBenchmark {
   }
 
   private static void displaySeparatedStats(String name, DescriptiveStatistics stats,
-                                   @Nonnull String separator) {
+                                   @NotNull String separator) {
     double err = stats.getStandardDeviation() / stats.getMean() * 100;
     System.out.println(Joiner.on(separator).join(new ArrayList<>(Arrays.asList(
             name,

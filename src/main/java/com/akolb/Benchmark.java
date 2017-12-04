@@ -40,18 +40,18 @@ import static com.akolb.Main.help;
 
 @State(Scope.Thread)
 public class Benchmark {
-  private static Logger LOG = LoggerFactory.getLogger(Main.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Main.class.getName());
 
   private static final String ENV_DB = "HMS_BENCH_DB";
   private static final String ENV_TABLE = "HMS_BENCH_TABLE";
 
 
-  HMSClient client;
-  String dbName;
-  String tableName;
+  private HMSClient client;
+  private String dbName;
+  private String tableName;
   List<FieldSchema> tableSchema;
   List<FieldSchema> partitionSchema;
-  Table table;
+  private Table table;
 
   public static void main(String[] args) throws RunnerException, TException {
 
@@ -154,12 +154,12 @@ public class Benchmark {
   }
 
   @org.openjdk.jmh.annotations.Benchmark
-  public void getAllDatabases() throws TException {
+  public void getAllDatabases() {
     client.getAllDatabasesNoException();
   }
 
   @org.openjdk.jmh.annotations.Benchmark
-  public void getAllTables() throws TException {
+  public void getAllTables() {
     client.getAllTablesNoException(dbName);
   }
 
