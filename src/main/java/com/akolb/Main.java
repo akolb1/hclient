@@ -53,6 +53,7 @@ class Main {
   private static final String CMD_CREATE = "create";
   private static final String CMD_ADD_PART = "addpart";
   private static final String CMD_DROP = "drop";
+  private static final String CMD_LIST_NID = "currnid";
 
 
   public static void main(String[] args) throws Exception {
@@ -212,6 +213,10 @@ class Main {
           } else {
             dropTables(client, dbName, tableName);
           }
+          break;
+
+        case CMD_LIST_NID:
+          System.out.println(client.getCurrentNotificationId());
           break;
 
         default:

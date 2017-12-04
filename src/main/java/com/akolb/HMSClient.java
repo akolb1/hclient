@@ -296,6 +296,10 @@ class HMSClient implements AutoCloseable {
             .collect(Collectors.toList()));
   }
 
+  long getCurrentNotificationId() throws TException {
+    return client.getCurrentNotificationEventId().getEventId();
+  }
+
   @Override
   public void close() throws Exception {
     if (loginContext != null) {
