@@ -8,6 +8,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.Nullable;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -22,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +42,7 @@ import static com.akolb.Main.help;
 
 @State(Scope.Thread)
 public class Benchmark {
-  private static final Logger LOG = LoggerFactory.getLogger(Main.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Benchmark.class);
 
   private static final String ENV_DB = "HMS_BENCH_DB";
   private static final String ENV_TABLE = "HMS_BENCH_TABLE";
@@ -80,12 +82,9 @@ public class Benchmark {
       help(options);
     }
 
-    String server = getServerUri(cmd).toString();
-    LOG.info("connecting to {}", server);
-
     HMSClient client = null;
     try {
-      client = new HMSClient(server);
+      client = new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)));
     } catch (IOException e) {
       LOG.error("Failed to connect to HMS", e);
       System.exit(1);
@@ -136,7 +135,7 @@ public class Benchmark {
     dbName = env.get(ENV_DB);
     String server = env.get(ENV_SERVER);
     System.out.println("Using server " + server + " table '" + dbName + "." + tableName + "'");
-    client = new HMSClient(server);
+    client = new HMSClient(getServerUri(server));
     table = makeTable(dbName, tableName, null, null);
   }
 

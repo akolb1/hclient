@@ -1,8 +1,7 @@
 package com.akolb;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -15,8 +14,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
 import org.jetbrains.annotations.NotNull;
@@ -24,66 +21,84 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.Subject;
-import javax.security.auth.kerberos.KerberosPrincipal;
-import javax.security.auth.login.AppConfigurationEntry;
 import javax.security.auth.login.LoginContext;
-import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class HMSClient implements AutoCloseable {
-  private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
   private static final String METASTORE_URI = "hive.metastore.uris";
+  private static final String HIVE_SITE = "/etc/hive/conf/hive-site.xml";
+  private static final String CORE_SITE = "/etc/hive/conf/core-site.xml";
+  private static final String PRINCIPAL_KEY = "hive.metastore.kerberos.principal";
 
   private final HiveMetaStoreClient client;
   private LoginContext loginContext;
 
-  HMSClient(@NotNull String server) throws MetaException, IOException, InterruptedException {
-    client = getClient(server);
-  }
-
-  HMSClient(@NotNull String server, @Nullable String principal, @Nullable String keytab)
+  HMSClient(@Nullable URI uri)
       throws MetaException, IOException, InterruptedException {
-    client = getClient(server, principal, keytab);
+    client = getClient(uri);
   }
 
-  private HiveMetaStoreClient getClient(@NotNull String server) throws MetaException,
-      IOException, InterruptedException {
-    return getClient(server, null, null);
+  private static void addResource(Configuration conf, String r) throws MalformedURLException {
+    File f = new File(r);
+    if (f.exists() && !f.isDirectory()) {
+      conf.addResource(f.toURI().toURL());
+    } else {
+      LOG.debug("File {} does not exist", r);
+    }
   }
 
   /**
    * Create a client to Hive Metastore.
    * If principal is specified, create kerberised client.
    *
-   * @param server    server:port
-   * @param principal Optional kerberos principal
-   * @param keyTab    Optional Kerberos keytab.
+   * @param uri server uri
    * @return {@link HiveMetaStoreClient} usable for talking to HMS
    * @throws MetaException        if fails to login using kerberos credentials
    * @throws IOException          if fails connecting to metastore
    * @throws InterruptedException if interrupted during kerberos setup
    */
-  private HiveMetaStoreClient getClient(@NotNull String server, @Nullable String principal,
-                                        @Nullable String keyTab)
+  private HiveMetaStoreClient getClient(@Nullable URI uri)
       throws MetaException, IOException, InterruptedException {
     HiveConf conf = new HiveConf();
-    conf.set(METASTORE_URI, server);
-    if (principal == null || principal.isEmpty()) {
-      return new HiveMetaStoreClient(conf);
+    addResource(conf, HIVE_SITE);
+    if (uri != null) {
+      conf.set(METASTORE_URI, uri.toString());
     }
-    return getKerberosClient(conf, Preconditions.checkNotNull(principal),
-        Preconditions.checkNotNull(keyTab));
+    if (conf.get(METASTORE_URI) == null) {
+      conf.set(METASTORE_URI, "localhost");
+    }
+
+    LOG.info("connecting to {}", conf.get(METASTORE_URI));
+
+    String principal = conf.get(PRINCIPAL_KEY);
+
+    if (principal == null) {
+      new HiveMetaStoreClient(conf);
+    }
+
+    LOG.debug("Opening kerberos connection to HMS");
+    addResource(conf, CORE_SITE);
+
+    Configuration hadoopConf = new Configuration();
+    addResource(hadoopConf, HIVE_SITE);
+    addResource(hadoopConf, CORE_SITE);
+
+    // Kerberos magic
+    UserGroupInformation.setConfiguration(hadoopConf);
+    UserGroupInformation userUGI = UserGroupInformation.getLoginUser();
+    return userUGI.doAs((PrivilegedExceptionAction<HiveMetaStoreClient>) () ->
+        new HiveMetaStoreClient(conf));
   }
 
   boolean dbExists(@NotNull String dbName) throws MetaException {
@@ -319,133 +334,6 @@ class HMSClient implements AutoCloseable {
       return client.dropPartition(dbName, tableName, arguments);
     } catch (TException e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * Borrowed from Sentry KerberosConfiguration.java
-   */
-  private HiveMetaStoreClient getKerberosClient(HiveConf conf,
-                                                @NotNull String principal,
-                                                @NotNull String keytab) throws IOException,
-      MetaException, InterruptedException {
-    String host = "localhost";
-    int port = 1234;
-
-    String serverPrincipal = SecurityUtil.getServerPrincipal(principal,
-        NetUtils.createSocketAddr(host, port).getAddress());
-    LOG.debug("Opening kerberos connection to HMS using kerberos principal {}, serverPrincipal {}",
-        principal, serverPrincipal);
-    File keytabFile = new File(keytab);
-    Preconditions.checkState(keytabFile.isFile() && keytabFile.canRead(),
-        "Keytab %s does not exist or is not readable", keytab);
-    Subject subject = new Subject(false,
-        Sets.newHashSet(new KerberosPrincipal(serverPrincipal)),
-        Collections.emptySet(), Collections.emptySet());
-    javax.security.auth.login.Configuration kerberosConfig =
-        KerberosConfiguration.createClientConfig(principal, keytabFile);
-
-    try {
-      loginContext = new LoginContext("", subject, null, kerberosConfig);
-      loginContext.login();
-    } catch (LoginException e) {
-      LOG.info("failed to login with subject {}", subject);
-      LOG.error("Failed to login", e);
-      throw new MetaException("Can't login via kerberos: " + e.getMessage());
-    }
-    subject = loginContext.getSubject();
-    conf.set("hadoop.security.authentication", "kerberos");
-    conf.set("hadoop.security.authorization", "true");
-    conf.set("hadoop.security.auth_to_local", "DEFAULT");
-    UserGroupInformation.setConfiguration(conf);
-    UserGroupInformation clientUGI =
-        UserGroupInformation.getUGIFromSubject(subject);
-    return clientUGI.doAs((PrivilegedExceptionAction<HiveMetaStoreClient>)
-        () -> new HiveMetaStoreClient(conf));
-  }
-
-
-  private static class KerberosConfiguration extends javax.security.auth.login.Configuration {
-    private static final String KRBCNAME = "KRB5CCNAME";
-
-    private final String principal;
-    private final String keytab;
-    private final boolean isInitiator;
-    private static final boolean IBM_JAVA = System.getProperty("java.vendor").contains("IBM");
-
-    private KerberosConfiguration(String principal, File keytab,
-                                  boolean client) {
-      this.principal = principal;
-      this.keytab = keytab.getAbsolutePath();
-      this.isInitiator = client;
-    }
-
-    static javax.security.auth.login.Configuration createClientConfig(String principal,
-                                                                      File keytab) {
-      return new KerberosConfiguration(principal, keytab, true);
-    }
-
-    public static javax.security.auth.login.Configuration createServerConfig(String principal,
-                                                                             File keytab) {
-      return new KerberosConfiguration(principal, keytab, false);
-    }
-
-    private static String getKrb5LoginModuleName() {
-      return (IBM_JAVA ? "com.ibm.security.auth.module.Krb5LoginModule"
-          : "com.sun.security.auth.module.Krb5LoginModule");
-    }
-
-    @Override
-    public AppConfigurationEntry[] getAppConfigurationEntry(String name) {
-      Map<String, String> options = new HashMap<>();
-
-      if (IBM_JAVA) {
-        // IBM JAVA's UseKeytab covers both keyTab and useKeyTab options
-        options.put("useKeytab", keytab.startsWith("file://") ? keytab : "file://" + keytab);
-
-        options.put("principal", principal);
-        options.put("refreshKrb5Config", "true");
-
-        // Both "initiator" and "acceptor"
-        options.put("credsType", "both");
-      } else {
-        options.put("keyTab", keytab);
-        options.put("principal", principal);
-        options.put("useKeyTab", "true");
-        options.put("storeKey", "true");
-        options.put("doNotPrompt", "true");
-        options.put("useTicketCache", "true");
-        options.put("renewTGT", "true");
-        options.put("refreshKrb5Config", "true");
-        options.put("isInitiator", Boolean.toString(isInitiator));
-      }
-
-      String ticketCache = System.getenv(KRBCNAME);
-      if (IBM_JAVA) {
-        // If cache is specified via env variable, it takes priority
-        if (ticketCache != null) {
-          // IBM JAVA only respects system property so copy ticket cache to system property
-          // The first value searched when "useDefaultCcache" is true.
-          System.setProperty(KRBCNAME, ticketCache);
-        } else {
-          ticketCache = System.getProperty(KRBCNAME);
-        }
-
-        if (ticketCache != null) {
-          options.put("useDefaultCcache", "true");
-          options.put("renewTGT", "true");
-        }
-      } else {
-        if (ticketCache != null) {
-          options.put("ticketCache", ticketCache);
-        }
-      }
-      options.put("debug", "true");
-
-      return new AppConfigurationEntry[] {
-          new AppConfigurationEntry(getKrb5LoginModuleName(),
-              AppConfigurationEntry.LoginModuleControlFlag.REQUIRED,
-              options)};
     }
   }
 }

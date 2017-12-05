@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * or only ones matching the filter.
  */
 public class BenchmarkSuite {
-  private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class);
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
   // List of benchmarks. All benchmarks are executed in the order

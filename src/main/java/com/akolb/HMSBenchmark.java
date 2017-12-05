@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -50,7 +51,7 @@ import static com.akolb.Main.help;
  */
 
 class HMSBenchmark {
-  private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
   private static final long scale = ChronoUnit.MILLIS.getDuration().getNano();
 
   private static final String OPT_SEPARATOR = "separator";
@@ -88,10 +89,6 @@ class HMSBenchmark {
       help(options);
     }
 
-    String server = getServerUri(cmd).toString();
-
-    LOG.info("connecting to {}", server);
-
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
 
@@ -115,8 +112,7 @@ class HMSBenchmark {
         Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
 
-    try (HMSClient client = new HMSClient(server)) {
-
+    try (HMSClient client = new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)))) {
       if (!client.dbExists(dbName)) {
         client.createDatabase(dbName);
       }
@@ -133,14 +129,12 @@ class HMSBenchmark {
 
       MicroBenchmark bench = new MicroBenchmark(warmup, spin);
       BenchmarkSuite suite = new BenchmarkSuite();
-      final String hostName = getServerUri(cmd).getHost();
       final String db = dbName;
       final String tbl = tableName;
 
       LOG.info("Using {} object instances", instances);
 
       displayStats(suite
-          .add("0-latency-0",   () -> benchmarkNetworkLatency(bench, hostName, DEFAULT_PORT))
           .add("listDatabases", () -> bench.measure(client::getAllDatabasesNoException))
           .add("listTables",    () -> bench.measure(() -> client.getAllTablesNoException(db)))
           .add("listTablesN",   () -> benchmarkListTables(bench, client, db, instances))

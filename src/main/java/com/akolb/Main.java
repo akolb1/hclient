@@ -1,16 +1,17 @@
 package com.akolb;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,11 +21,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 class Main {
-  private static final Logger LOG = LoggerFactory.getLogger(Main.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(Main.class);
   // Default column type
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
@@ -43,8 +43,6 @@ class Main {
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
   static final String OPT_PATTERN = "pattern";
-  private static final String OPT_KERBEROS = "kerberos";
-  private static final String OPT_KEYTAB = "keytab";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
@@ -66,8 +64,6 @@ class Main {
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
-        .addOption("K", OPT_KERBEROS, true, "Kerberos principal")
-        .addOption("T", OPT_KEYTAB, true, "Kerberos keytab")
         .addOption("D", OPT_DROP, false, "drop table if exists");
 
     CommandLineParser parser = new DefaultParser();
@@ -85,10 +81,6 @@ class Main {
       help(options);
     }
 
-    String server = getServerUri(cmd).toString();
-
-    LOG.info("connecting to " + server);
-
     List<String> arguments = cmd.getArgList();
     String command = CMD_LIST;
     if (!arguments.isEmpty()) {
@@ -105,16 +97,8 @@ class Main {
         Collections.emptyList() :
         new ArrayList<>(Arrays.asList(partitions));
     boolean verbose = cmd.hasOption(OPT_VERBOSE);
-    String principal = null;
-    String keytab = null;
-    if (cmd.hasOption(OPT_KERBEROS)) {
-      LOG.info("Using Kerberos");
-      Preconditions.checkNotNull(cmd.getOptionValue(OPT_KEYTAB));
-      principal = cmd.getOptionValue(OPT_KERBEROS);
-      keytab = Preconditions.checkNotNull(cmd.getOptionValue(OPT_KEYTAB));
-    }
 
-    try (HMSClient client = new HMSClient(server, principal, keytab)) {
+    try (HMSClient client = new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)))) {
       switch (command) {
         case CMD_LIST:
           displayTables(client, dbName, tableName, verbose);
@@ -232,17 +216,13 @@ class Main {
     System.exit(0);
   }
 
-  static URI getServerUri(CommandLine cmd) {
-    Map<String, String> env = System.getenv();
-    String defaultServer = env.get(ENV_SERVER);
-    if (defaultServer == null) {
-      defaultServer = DEFAULT_HOST;
+  static @Nullable URI getServerUri(@Nullable String host) {
+    if (host == null) {
+      return null;
     }
 
-    String server = cmd.getOptionValue(OPT_HOST, defaultServer);
-
     try {
-      return new URI(THRIFT_SCHEMA, null, server, DEFAULT_PORT,
+      return new URI(THRIFT_SCHEMA, null, host, DEFAULT_PORT,
           null, null, null);
     } catch (URISyntaxException e) {
       e.printStackTrace();
