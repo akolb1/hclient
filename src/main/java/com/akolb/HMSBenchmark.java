@@ -4,7 +4,6 @@ import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
@@ -12,7 +11,6 @@ import org.apache.commons.cli.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileWriter;
 import java.io.PrintStream;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -153,15 +151,16 @@ class HMSBenchmark {
           .setFmt(fmt)
           .add("listDatabases", () -> benchmarkListDatabases(bench, client))
           .add("listTables", () -> benchmarkListAllTables(bench, client, db))
-          .add("listTablesN", () -> benchmarkListTables(bench, client, db, instances))
+          .add("listTables"+'.'+instances,
+              () -> benchmarkListTables(bench, client, db, instances))
           .add("getTable", () -> benchmarkGetTable(bench, client, db, tbl))
           .add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl))
           .add("dropTable", () -> benchmarkDeleteCreate(bench, client, db, tbl))
           .add("addPartition", () -> benchmarkCreatePartition(bench, client, db, tbl))
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
-          .add("listPartitions", () -> benchmarkListManyPartitions(bench, client, db, tbl,
-              instances))
+          .add("listPartitions"+'.'+instances,
+              () -> benchmarkListManyPartitions(bench, client, db, tbl, instances))
           .add("getNid", () -> benchmarkGetNotificationId(bench, client))
           .runMatching(patterns);
 

@@ -1,5 +1,6 @@
 package com.akolb;
 
+import com.google.common.base.Joiner;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -44,6 +45,7 @@ class Main {
   static final String OPT_NUMBER = "number";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
+  static final String OPT_SHOW_PARTS = "showparts";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
@@ -66,6 +68,7 @@ class Main {
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
+        .addOption(new Option(OPT_SHOW_PARTS, false, "show partitions"))
         .addOption("D", OPT_DROP, false, "drop table if exists");
 
     CommandLineParser parser = new DefaultParser();
@@ -105,7 +108,7 @@ class Main {
                  cmd.getOptionValue(OPT_CONF))) {
       switch (command) {
         case CMD_LIST:
-          displayTables(client, dbName, tableName, verbose);
+          cmdDisplayTables(client, cmd);
           break;
 
         case CMD_CREATE:
@@ -261,8 +264,12 @@ class Main {
     return cols;
   }
 
-  private static void displayTables(HMSClient client, String dbName,
-                                    String tableName, boolean verbose) throws MetaException {
+  private static void cmdDisplayTables(HMSClient client, CommandLine cmd) throws MetaException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+    boolean verbose = cmd.hasOption(OPT_VERBOSE);
+    boolean showPartitions = cmd.hasOption(OPT_SHOW_PARTS);
+
     for (String database : client.getAllDatabases(dbName)) {
       client.getAllTables(database, tableName)
           .stream()
@@ -271,13 +278,10 @@ class Main {
             if (verbose) {
               Table table = client.getTableNoException(database, tblName);
               displayTableSchema(table);
-              String tableLocation = table.getSd().getLocation() + "/";
-              client.listPartitionsNoException(database, tblName)
-                  .forEach(p -> System.out.println("\t\t" +
-                      p
-                          .getSd()
-                          .getLocation()
-                          .replaceAll(tableLocation, "")));
+              if (showPartitions) {
+                System.out.println("\t\t"+Joiner.on("\n\t\t")
+                    .join(client.getPartitionNamesNoException(database, tblName)));
+              }
               System.out.println();
             } else {
               System.out.println(database + "." + tblName);
@@ -320,4 +324,5 @@ class Main {
     table.getPartitionKeys()
         .forEach(schema -> System.out.println("\t  " + schema.getName() + ":\t" + schema.getType()));
   }
+
 }

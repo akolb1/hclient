@@ -21,7 +21,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.login.LoginContext;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -331,6 +330,18 @@ class HMSClient implements AutoCloseable {
     }
   }
 
+  List<String> getPartitionNames(String dbName, String tableName) throws TException {
+    return client.listPartitionNames(dbName, tableName, (short)-1);
+  }
+
+  List<String> getPartitionNamesNoException(String dbName, String tableName) {
+    try {
+      return client.listPartitionNames(dbName, tableName, (short)-1);
+    } catch (TException e) {
+      throw  new RuntimeException(e);
+    }
+  }
+
   @Override
   public void close() throws Exception {
     client.close();
@@ -348,4 +359,5 @@ class HMSClient implements AutoCloseable {
       throw new RuntimeException(e);
     }
   }
+
 }
