@@ -1,12 +1,14 @@
 package com.akolb;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,11 +23,40 @@ import java.util.stream.Collectors;
  */
 public class BenchmarkSuite {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class);
+  // Delta margin for data sanitizing
+  private final static double MARGIN = 2;
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
   // List of benchmarks. All benchmarks are executed in the order
   // they are inserted
   private final List<String> benchmarks = new ArrayList<>();
+  private final Map<String, DescriptiveStatistics> result = new TreeMap<>();
+  private final boolean doSanitize;
+  private long scale = 1;
+  private double minMean = 0;
+
+  /**
+   * Create new benchmark suite without data sanitizing
+   */
+  public BenchmarkSuite() {
+    this(false);
+  }
+
+  BenchmarkSuite setScale(long scale) {
+    this.scale = scale;
+    return this;
+  }
+
+  /**
+   * Create new benchmark suite.<p>
+   * <p>
+   * The suite can run multiple benchmarks.
+   *
+   * @param doSanitize Sanitize data if true
+   */
+  BenchmarkSuite(boolean doSanitize) {
+    this.doSanitize = doSanitize;
+  }
 
   public List<String> list(@Nullable List<String> patterns) {
     if (patterns == null || patterns.isEmpty()) {
@@ -37,28 +68,43 @@ public class BenchmarkSuite {
         .collect(Collectors.toList());
   }
 
-  private Map<String, DescriptiveStatistics> runAll() {
-    Map<String, DescriptiveStatistics> result = new TreeMap<>();
-    benchmarks.forEach(name -> {
-      LOG.info("Running benchmark {}", name);
-      result.put(name, suite.get(name).get());
-    });
-    return result;
+  private BenchmarkSuite runAll() {
+    if (doSanitize) {
+      benchmarks.forEach(name -> {
+        LOG.info("Running benchmark {}", name);
+        result.put(name, sanitize(suite.get(name).get()));
+      });
+    } else {
+      benchmarks.forEach(name -> {
+        LOG.info("Running benchmark {}", name);
+        result.put(name, suite.get(name).get());
+      });
+    }
+    return this;
   }
 
-  public Map<String, DescriptiveStatistics> runMatching(@Nullable List<String> patterns) {
+  public BenchmarkSuite runMatching(@Nullable List<String> patterns) {
     if (patterns == null || patterns.isEmpty()) {
       return runAll();
     }
-    Map<String, DescriptiveStatistics> result = new TreeMap<>();
-    benchmarks
-        .stream()
-        .filter(s -> matches(s, patterns))
-        .forEach(k -> {
-          LOG.info("Running benchmark {}", k);
-          result.put(k, suite.get(k).get());
-        });
-    return result;
+    if (doSanitize) {
+      benchmarks
+          .stream()
+          .filter(s -> matches(s, patterns))
+          .forEach(k -> {
+            LOG.info("Running benchmark {}", k);
+            result.put(k, sanitize(suite.get(k).get()));
+          });
+    } else {
+      benchmarks
+          .stream()
+          .filter(s -> matches(s, patterns))
+          .forEach(k -> {
+            LOG.info("Running benchmark {}", k);
+            result.put(k, suite.get(k).get());
+          });
+    }
+    return this;
   }
 
   public BenchmarkSuite add(@NotNull String name, @NotNull Supplier<DescriptiveStatistics> b) {
@@ -69,5 +115,59 @@ public class BenchmarkSuite {
 
   private static boolean matches(@NotNull String what, @NotNull List<String> patterns) {
     return patterns.stream().anyMatch(what::matches);
+  }
+
+  /**
+   * Get new statistics that excludes values beyond mean +/- 2 * stdev
+   *
+   * @param data Source data
+   * @return new {@link @DescriptiveStatistics objects with sanitized data}
+   */
+  private static DescriptiveStatistics sanitize(DescriptiveStatistics data) {
+    double meanValue = data.getMean();
+    double delta = MARGIN * meanValue;
+    double minVal = meanValue - delta;
+    double maxVal = meanValue + delta;
+    return new DescriptiveStatistics(Arrays.stream(data.getValues())
+        .filter(x -> x > minVal && x < maxVal)
+        .toArray());
+  }
+
+  private static double median(DescriptiveStatistics data) {
+    return new Median().evaluate(data.getValues());
+  }
+
+  /**
+   *
+   * @return minimum of all mean values
+   */
+  private double minMean() {
+    double[] data = result.entrySet()
+        .stream()
+        .mapToDouble(e -> e.getValue().getMean())
+        .toArray();
+    return new DescriptiveStatistics(data).getMin();
+  }
+
+  private void displayStats(String name, DescriptiveStatistics stats) {
+    double mean = stats.getMean();
+    double err = stats.getStandardDeviation() / mean * 100;
+
+    System.out.printf("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
+        name,
+        (mean - minMean) / scale,
+        mean / scale,
+        median(stats) / scale,
+        stats.getMin() / scale,
+        stats.getMax() / scale,
+        err);
+  }
+
+  BenchmarkSuite display() {
+    System.out.printf("%-30s %-6s %-6s %-6s %-6s %-6s %-6s%n",
+        "Operation", "AMean", "Mean", "Med", "Min", "Max", "Err%");
+    minMean = minMean();
+    result.forEach(this::displayStats);
+    return this;
   }
 }

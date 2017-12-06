@@ -35,7 +35,7 @@ class Main {
 
   private static final String DBNAME = "default";
 
-  static final String OPT_HOST = "server";
+  static final String OPT_HOST = "host";
   static final String OPT_PARTITIONS = "partitions";
   static final String OPT_DATABASE = "database";
   static final String OPT_TABLE = "table";
@@ -43,6 +43,7 @@ class Main {
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
   static final String OPT_PATTERN = "pattern";
+  static final String OPT_CONF = "conf";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
@@ -64,6 +65,7 @@ class Main {
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
+        .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption("D", OPT_DROP, false, "drop table if exists");
 
     CommandLineParser parser = new DefaultParser();
@@ -98,7 +100,9 @@ class Main {
         new ArrayList<>(Arrays.asList(partitions));
     boolean verbose = cmd.hasOption(OPT_VERBOSE);
 
-    try (HMSClient client = new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)))) {
+    try (HMSClient client =
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)),
+                 cmd.getOptionValue(OPT_CONF))) {
       switch (command) {
         case CMD_LIST:
           displayTables(client, dbName, tableName, verbose);
@@ -210,7 +214,7 @@ class Main {
     }
   }
 
-  static void help(Options options) {
+  private static void help(Options options) {
     HelpFormatter formater = new HelpFormatter();
     formater.printHelp("hclient list|create|addpart <options> [name:type...]", options);
     System.exit(0);

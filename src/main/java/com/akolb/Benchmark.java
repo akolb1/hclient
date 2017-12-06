@@ -3,12 +3,12 @@ package com.akolb;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
-import org.jetbrains.annotations.Nullable;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -23,7 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -31,14 +30,13 @@ import static com.akolb.HMSClient.makeTable;
 import static com.akolb.Main.ENV_SERVER;
 import static com.akolb.Main.OPT_DATABASE;
 import static com.akolb.Main.OPT_DROP;
+import static com.akolb.Main.OPT_HOST;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_HOST;
 import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Main.getServerUri;
-import static com.akolb.Main.help;
 
 @State(Scope.Thread)
 public class Benchmark {
@@ -160,6 +158,12 @@ public class Benchmark {
   @org.openjdk.jmh.annotations.Benchmark
   public void getAllTables() {
     client.getAllTablesNoException(dbName);
+  }
+
+  private static void help(org.apache.commons.cli.Options options) {
+    HelpFormatter formater = new HelpFormatter();
+    formater.printHelp("hbench ...", options);
+    System.exit(0);
   }
 
 }

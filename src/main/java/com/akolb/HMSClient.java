@@ -37,24 +37,32 @@ import java.util.stream.IntStream;
 class HMSClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
   private static final String METASTORE_URI = "hive.metastore.uris";
-  private static final String HIVE_SITE = "/etc/hive/conf/hive-site.xml";
-  private static final String CORE_SITE = "/etc/hive/conf/core-site.xml";
+  private static final String CONFIG_DIR = "/etc/hive/conf";
+  private static final String HIVE_SITE = "hive-site.xml";
+  private static final String CORE_SITE = "core-site.xml";
   private static final String PRINCIPAL_KEY = "hive.metastore.kerberos.principal";
 
   private final HiveMetaStoreClient client;
-  private LoginContext loginContext;
+  private final String confDir;
 
   HMSClient(@Nullable URI uri)
       throws MetaException, IOException, InterruptedException {
+    this(uri, CONFIG_DIR);
+  }
+
+  HMSClient(@Nullable URI uri, @Nullable String confDir)
+      throws MetaException, IOException, InterruptedException {
+    this.confDir = (confDir == null ? CONFIG_DIR : confDir);
     client = getClient(uri);
   }
 
-  private static void addResource(Configuration conf, String r) throws MalformedURLException {
-    File f = new File(r);
+  private void addResource(Configuration conf, @NotNull String r) throws MalformedURLException {
+    File f = new File(confDir + "/" + r);
     if (f.exists() && !f.isDirectory()) {
+      LOG.debug("Adding configuration resource {}", r);
       conf.addResource(f.toURI().toURL());
     } else {
-      LOG.debug("File {} does not exist", r);
+      LOG.debug("Configuration {} does not exist", r);
     }
   }
 
@@ -317,10 +325,6 @@ class HMSClient implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
-    if (loginContext != null) {
-      loginContext.logout();
-      loginContext = null;
-    }
     client.close();
   }
 
