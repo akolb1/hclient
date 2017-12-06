@@ -22,7 +22,9 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.LoginException;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 
@@ -89,6 +91,10 @@ public class Benchmark {
     } catch (InterruptedException e) {
       LOG.error("Interrupted while connecting to HMS", e);
       System.exit(1);
+    } catch (LoginException e) {
+      LOG.error("Failed to perform Kerberos login", e);
+    } catch (URISyntaxException e) {
+      LOG.error("Invalid URI syntax", e);
     }
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
@@ -127,7 +133,7 @@ public class Benchmark {
   }
 
   @Setup
-  public void setup() throws MetaException, IOException, InterruptedException {
+  public void setup() throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     Map<String, String> env = System.getenv();
     tableName = env.get(ENV_TABLE);
     dbName = env.get(ENV_DB);

@@ -34,7 +34,6 @@ import static com.akolb.Main.OPT_HOST;
 import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_TABLE;
 import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Main.getServerUri;
 
@@ -48,6 +47,7 @@ class HMSBenchmark {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
   private static final long scale = ChronoUnit.MILLIS.getDuration().getNano();
   private static final String CSV_SEPARATOR = "\t";
+  private static final String TEST_TABLE = "bench_table";
 
   private static final String OPT_SEPARATOR = "separator";
   private static final String OPT_SPIN = "spin";
@@ -63,7 +63,6 @@ class HMSBenchmark {
         .addOption("P", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
-        .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("K", OPT_SEPARATOR, true, "field separator")
@@ -97,19 +96,10 @@ class HMSBenchmark {
     }
 
     String dbName = cmd.getOptionValue(OPT_DATABASE);
-    String tableName = cmd.getOptionValue(OPT_TABLE);
-
-    if (tableName != null && tableName.contains(".")) {
-      String[] parts = tableName.split("\\.");
-      dbName = parts[0];
-      tableName = parts[1];
-    }
+    String tableName = TEST_TABLE;
 
     if (dbName == null || dbName.isEmpty()) {
       throw new RuntimeException("Missing DB name");
-    }
-    if (tableName == null || tableName.isEmpty()) {
-      throw new RuntimeException("Missing Table name");
     }
 
     LOG.info("Using table '{}.{}", dbName, tableName);

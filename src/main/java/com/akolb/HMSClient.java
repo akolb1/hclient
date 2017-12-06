@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -11,48 +12,64 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.hive.shims.Utils;
+import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TFastFramedTransport;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.LoginException;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-class HMSClient implements AutoCloseable {
+final class HMSClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
   private static final String METASTORE_URI = "hive.metastore.uris";
   private static final String CONFIG_DIR = "/etc/hive/conf";
   private static final String HIVE_SITE = "hive-site.xml";
   private static final String CORE_SITE = "core-site.xml";
   private static final String PRINCIPAL_KEY = "hive.metastore.kerberos.principal";
+  private static final long SOCKET_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(600);
 
-  private final HiveMetaStoreClient client;
   private final String confDir;
+  private ThriftHiveMetastore.Iface client;
+  private TTransport transport;
 
   HMSClient(@Nullable URI uri)
-      throws MetaException, IOException, InterruptedException {
+      throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this(uri, CONFIG_DIR);
   }
 
   HMSClient(@Nullable URI uri, @Nullable String confDir)
-      throws MetaException, IOException, InterruptedException {
+      throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this.confDir = (confDir == null ? CONFIG_DIR : confDir);
-    client = getClient(uri);
+    getClient(uri);
   }
 
   private void addResource(Configuration conf, @NotNull String r) throws MalformedURLException {
@@ -75,23 +92,25 @@ class HMSClient implements AutoCloseable {
    * @throws IOException          if fails connecting to metastore
    * @throws InterruptedException if interrupted during kerberos setup
    */
-  private HiveMetaStoreClient getClient(@Nullable URI uri)
-      throws MetaException, IOException, InterruptedException {
+  private void getClient(@Nullable URI uri)
+      throws TException, IOException, InterruptedException, URISyntaxException, LoginException {
     HiveConf conf = new HiveConf();
     addResource(conf, HIVE_SITE);
     if (uri != null) {
       conf.set(METASTORE_URI, uri.toString());
     }
-    if (conf.get(METASTORE_URI) == null) {
-      conf.set(METASTORE_URI, "localhost");
-    }
 
-    LOG.info("connecting to {}", conf.get(METASTORE_URI));
+    // Pick up the first URI from the list of available URIs
+    URI serverURI = uri != null ?
+        uri :
+        new URI(conf.get(METASTORE_URI).split(",")[0]);
+
+    LOG.info("connecting to {}", serverURI);
 
     String principal = conf.get(PRINCIPAL_KEY);
 
     if (principal == null) {
-      new HiveMetaStoreClient(conf);
+      open(conf, serverURI);
     }
 
     LOG.debug("Opening kerberos connection to HMS");
@@ -103,16 +122,16 @@ class HMSClient implements AutoCloseable {
 
     // Kerberos magic
     UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation userUGI = UserGroupInformation.getLoginUser();
-    return userUGI.doAs((PrivilegedExceptionAction<HiveMetaStoreClient>) () ->
-        new HiveMetaStoreClient(conf));
+    UserGroupInformation.getLoginUser()
+        .doAs((PrivilegedExceptionAction<TTransport>)
+            () -> open(conf, serverURI));
   }
 
-  boolean dbExists(@NotNull String dbName) throws MetaException {
+  boolean dbExists(@NotNull String dbName) throws TException {
     return getAllDatabases(dbName).contains(dbName);
   }
 
-  boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws MetaException {
+  boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws TException {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
@@ -123,11 +142,11 @@ class HMSClient implements AutoCloseable {
    * @return list of database names matching the filter
    * @throws MetaException
    */
-  Set<String> getAllDatabases(@Nullable String filter) throws MetaException {
+  Set<String> getAllDatabases(@Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
-      return new HashSet<>(client.getAllDatabases());
+      return new HashSet<>(client.get_all_databases());
     }
-    return client.getAllDatabases()
+    return client.get_all_databases()
         .stream()
         .filter(n -> n.matches(filter))
         .collect(Collectors.toSet());
@@ -135,17 +154,17 @@ class HMSClient implements AutoCloseable {
 
   List<String> getAllDatabasesNoException() {
     try {
-      return client.getAllDatabases();
-    } catch (MetaException e) {
+      return client.get_all_databases();
+    } catch (TException e) {
       throw new RuntimeException(e);
     }
   }
 
-  Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws MetaException {
+  Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
-      return new HashSet<>(client.getAllTables(dbName));
+      return new HashSet<>(client.get_all_tables(dbName));
     }
-    return client.getAllTables(dbName)
+    return client.get_all_tables(dbName)
         .stream()
         .filter(n -> n.matches(filter))
         .collect(Collectors.toSet());
@@ -153,8 +172,8 @@ class HMSClient implements AutoCloseable {
 
   List<String> getAllTablesNoException(@NotNull String dbName) {
     try {
-      return client.getAllTables(dbName);
-    } catch (MetaException e) {
+      return client.get_all_tables(dbName);
+    } catch (TException e) {
       throw new RuntimeException(e);
     }
   }
@@ -167,11 +186,11 @@ class HMSClient implements AutoCloseable {
   void createDatabase(@NotNull String name) throws TException {
     Database db = new Database();
     db.setName(name);
-    client.createDatabase(db);
+    client.create_database(db);
   }
 
   void createTable(Table table) throws TException {
-    client.createTable(table);
+    client.create_table(table);
   }
 
   /**
@@ -181,14 +200,14 @@ class HMSClient implements AutoCloseable {
    */
   void createTableNoException(@NotNull Table table) {
     try {
-      client.createTable(table);
+      createTable(table);
     } catch (TException e) {
       throw new RuntimeException(e);
     }
   }
 
   void dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
-    client.dropTable(dbName, tableName);
+    client.drop_table(dbName, tableName, true);
   }
 
   /**
@@ -199,20 +218,19 @@ class HMSClient implements AutoCloseable {
    */
   void dropTableNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
-      client.dropTable(dbName, tableName);
+      dropTable(dbName, tableName);
     } catch (TException e) {
       throw new RuntimeException(e);
     }
   }
 
-
   Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
-    return client.getTable(dbName, tableName);
+    return client.get_table(dbName, tableName);
   }
 
   Table getTableNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
-      return client.getTable(dbName, tableName);
+      return getTable(dbName, tableName);
     } catch (TException e) {
       throw new RuntimeException(e);
     }
@@ -293,12 +311,12 @@ class HMSClient implements AutoCloseable {
   }
 
   List<Partition> listPartitions(String dbName, String tableName) throws TException {
-    return client.listPartitions(dbName, tableName, (short) -1);
+    return client.get_partitions(dbName, tableName, (short) -1);
   }
 
   List<Partition> listPartitionsNoException(String dbName, String tableName) {
     try {
-      return client.listPartitions(dbName, tableName, (short) -1);
+      return listPartitions(dbName, tableName);
     } catch (TException e) {
       LOG.error("Failed to list partitions", e);
       throw new RuntimeException(e);
@@ -307,7 +325,7 @@ class HMSClient implements AutoCloseable {
 
   void addManyPartitions(String dbName, String tableName,
                          List<String> arguments, int nPartitions) throws TException {
-    Table table = client.getTable(dbName, tableName);
+    Table table = client.get_table(dbName, tableName);
     createPartitions(
         IntStream.range(0, nPartitions)
             .mapToObj(i ->
@@ -319,45 +337,101 @@ class HMSClient implements AutoCloseable {
   }
 
   long getCurrentNotificationId() throws TException {
-    return client.getCurrentNotificationEventId().getEventId();
+    return client.get_current_notificationEventId().getEventId();
   }
 
   long getCurrentNotificationIdNoException() {
     try {
-      return client.getCurrentNotificationEventId().getEventId();
+      return getCurrentNotificationId();
     } catch (TException e) {
       throw new RuntimeException(e);
     }
   }
 
   List<String> getPartitionNames(String dbName, String tableName) throws TException {
-    return client.listPartitionNames(dbName, tableName, (short)-1);
+    return client.get_partition_names(dbName, tableName, (short) -1);
   }
 
   List<String> getPartitionNamesNoException(String dbName, String tableName) {
     try {
-      return client.listPartitionNames(dbName, tableName, (short)-1);
+      return getPartitionNames(dbName, tableName);
     } catch (TException e) {
-      throw  new RuntimeException(e);
+      throw new RuntimeException(e);
     }
   }
 
   @Override
   public void close() throws Exception {
-    client.close();
+    if ((transport != null) && transport.isOpen()) {
+      LOG.debug("Closing thrift transport");
+      transport.close();
+    }
   }
 
   public boolean dropPartition(String dbName, String tableName, List<String> arguments)
       throws TException {
-    return client.dropPartition(dbName, tableName, arguments);
+    return client.drop_partition(dbName, tableName, arguments, true);
   }
 
   public boolean dropPartitionNoException(String dbName, String tableName, List<String> arguments) {
     try {
-      return client.dropPartition(dbName, tableName, arguments);
+      return dropPartition(dbName, tableName, arguments);
     } catch (TException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  TTransport open(HiveConf conf, @NotNull URI uri) throws
+      TException, IOException, LoginException {
+    LOG.debug("Connecting to {}", uri);
+    boolean useSasl = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL);
+    boolean useFramedTransport = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_FRAMED_TRANSPORT);
+    boolean useCompactProtocol = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_COMPACT_PROTOCOL);
+    LOG.debug("Connecting to {}, framedTransport = {}", uri, useFramedTransport);
+
+    transport = new TSocket(uri.getHost(), uri.getPort(), (int) SOCKET_TIMEOUT_MS);
+
+    if (useSasl) {
+      LOG.debug("Using SASL authentication");
+      HadoopThriftAuthBridge.Client authBridge =
+          ShimLoader.getHadoopThriftAuthBridge().createClient();
+      // check if we should use delegation tokens to authenticate
+      // the call below gets hold of the tokens if they are set up by hadoop
+      // this should happen on the map/reduce tasks if the client added the
+      // tokens into hadoop's credential store in the front end during job
+      // submission.
+      String tokenSig = conf.get("hive.metastore.token.signature");
+      // tokenSig could be null
+      String tokenStrForm = Utils.getTokenStrForm(tokenSig);
+      if (tokenStrForm != null) {
+        LOG.debug("Using delegation tokens");
+        // authenticate using delegation tokens via the "DIGEST" mechanism
+        transport = authBridge.createClientTransport(null, uri.getHost(),
+            "DIGEST", tokenStrForm, transport,
+            MetaStoreUtils.getMetaStoreSaslProperties(conf));
+      } else {
+        LOG.debug("Using principal");
+        String principalConfig =
+            conf.getVar(HiveConf.ConfVars.METASTORE_KERBEROS_PRINCIPAL);
+        LOG.debug("Using principal {}", principalConfig);
+        transport = authBridge.createClientTransport(
+            principalConfig, uri.getHost(), "KERBEROS", null,
+            transport, MetaStoreUtils.getMetaStoreSaslProperties(conf));
+      }
+    }
+
+    transport = useFramedTransport ? new TFastFramedTransport(transport) : transport;
+    TProtocol protocol = useCompactProtocol ?
+        new TCompactProtocol(transport) :
+        new TBinaryProtocol(transport);
+    client = new ThriftHiveMetastore.Client(protocol);
+    transport.open();
+    if (!useSasl && conf.getBoolVar(HiveConf.ConfVars.METASTORE_EXECUTE_SET_UGI)) {
+      UserGroupInformation ugi = Utils.getUGI();
+      client.set_ugi(ugi.getUserName(), Arrays.asList(ugi.getGroupNames()));
+    }
+    LOG.debug("Connected to metastore, using compact protocol = {}", useCompactProtocol);
+    return transport;
   }
 
 }

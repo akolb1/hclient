@@ -13,7 +13,7 @@
         </File>
     </Appenders>
     <Loggers>
-        <Root level="info">
+        <Root level="debug">
             <AppenderRef ref="STDERR"/>
         </Root>
     </Loggers>

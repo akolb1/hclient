@@ -264,7 +264,7 @@ class Main {
     return cols;
   }
 
-  private static void cmdDisplayTables(HMSClient client, CommandLine cmd) throws MetaException {
+  private static void cmdDisplayTables(HMSClient client, CommandLine cmd) throws TException {
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
     boolean verbose = cmd.hasOption(OPT_VERBOSE);
@@ -291,7 +291,7 @@ class Main {
   }
 
   private static void dropTables(HMSClient client, String dbName, String tableName)
-      throws MetaException {
+      throws TException {
     for (String database : client.getAllDatabases(dbName)) {
       client.getAllTables(database, tableName)
           .stream()
