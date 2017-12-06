@@ -323,6 +323,14 @@ class HMSClient implements AutoCloseable {
     return client.getCurrentNotificationEventId().getEventId();
   }
 
+  long getCurrentNotificationIdNoException() {
+    try {
+      return client.getCurrentNotificationEventId().getEventId();
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
   public void close() throws Exception {
     client.close();

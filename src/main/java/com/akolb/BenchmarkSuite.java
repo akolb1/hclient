@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ public class BenchmarkSuite {
   private final boolean doSanitize;
   private long scale = 1;
   private double minMean = 0;
+  private Formatter fmt;
 
   /**
    * Create new benchmark suite without data sanitizing
@@ -44,6 +46,11 @@ public class BenchmarkSuite {
 
   BenchmarkSuite setScale(long scale) {
     this.scale = scale;
+    return this;
+  }
+
+  BenchmarkSuite setFmt(Formatter fmt) {
+    this.fmt = fmt;
     return this;
   }
 
@@ -138,7 +145,6 @@ public class BenchmarkSuite {
   }
 
   /**
-   *
    * @return minimum of all mean values
    */
   private double minMean() {
@@ -153,7 +159,7 @@ public class BenchmarkSuite {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
 
-    System.out.printf("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
+    fmt.format("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
         name,
         (mean - minMean) / scale,
         mean / scale,
@@ -163,11 +169,34 @@ public class BenchmarkSuite {
         err);
   }
 
+  private void displayCSV(String name, DescriptiveStatistics stats, String separator) {
+    double mean = stats.getMean();
+    double err = stats.getStandardDeviation() / mean * 100;
+
+    fmt.format("%s%s%g%s%g%s%g%s%g%s%g%s%g%n",
+        name, separator,
+        (mean - minMean) / scale, separator,
+        mean / scale, separator,
+        median(stats) / scale, separator,
+        stats.getMin() / scale, separator,
+        stats.getMax() / scale, separator,
+        err);
+  }
+
   BenchmarkSuite display() {
-    System.out.printf("%-30s %-6s %-6s %-6s %-6s %-6s %-6s%n",
+    fmt.format("%-30s %-6s %-6s %-6s %-6s %-6s %-6s%n",
         "Operation", "AMean", "Mean", "Med", "Min", "Max", "Err%");
     minMean = minMean();
     result.forEach(this::displayStats);
+    return this;
+  }
+
+  BenchmarkSuite displayCSV(String separator) {
+    fmt.format("%s%s%s%s%6s%s%s%s%s%s%s%s%s%n",
+        "Operation", separator, "AMean", separator, "Mean", separator, "Med", separator, "Min",
+        separator, "Max", separator, "Err%");
+    minMean = minMean();
+    result.forEach((name, s) -> displayCSV(name, s, separator));
     return this;
   }
 }

@@ -202,4 +202,10 @@ class HMSBenchmarks {
         createSchema(Collections.singletonList("name:string")),
         createSchema(Collections.singletonList("date"))));
   }
+
+  static DescriptiveStatistics benchmarkGetNotificationId(MicroBenchmark benchmark,
+                                                      final HMSClient client) {
+    return benchmark.measure(client::getCurrentNotificationIdNoException);
+  }
+
 }
