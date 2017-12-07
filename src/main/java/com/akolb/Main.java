@@ -9,7 +9,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +31,7 @@ class Main {
 
   private static final String DEFAULT_HOST = "localhost";
   private static final String THRIFT_SCHEMA = "thrift";
-  static final int DEFAULT_PORT = 9083;
+  private static final int DEFAULT_PORT = 9083;
 
   private static final String DBNAME = "default";
 
@@ -45,7 +44,7 @@ class Main {
   static final String OPT_NUMBER = "number";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
-  static final String OPT_SHOW_PARTS = "showparts";
+  private static final String OPT_SHOW_PARTS = "showparts";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
   static final String ENV_SERVER = "HMS_THRIFT_SERVER";
@@ -279,7 +278,7 @@ class Main {
               Table table = client.getTableNoException(database, tblName);
               displayTableSchema(table);
               if (showPartitions) {
-                System.out.println("\t\t"+Joiner.on("\n\t\t")
+                System.out.println("\t\t" + Joiner.on("\n\t\t")
                     .join(client.getPartitionNamesNoException(database, tblName)));
               }
               System.out.println();

@@ -21,6 +21,7 @@ import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
+import static com.akolb.HMSBenchmarks.benchmarkGetPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetTable;
 import static com.akolb.HMSBenchmarks.benchmarkListAllTables;
 import static com.akolb.HMSBenchmarks.benchmarkListDatabases;
@@ -136,6 +137,7 @@ class HMSBenchmark {
       MicroBenchmark bench = new MicroBenchmark(warmup, spin);
       BenchmarkSuite suite = new BenchmarkSuite(cmd.hasOption(OPT_SANITIZE));
 
+      // Arrange various benchmarks in a suite
       BenchmarkSuite result = suite
           .setScale(scale)
           .setFmt(fmt)
@@ -151,6 +153,10 @@ class HMSBenchmark {
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
           .add("listPartitions"+'.'+instances,
               () -> benchmarkListManyPartitions(bench, client, db, tbl, instances))
+          .add("getPartition",
+              () -> benchmarkGetPartitions(bench, client, db, tbl, 1))
+          .add("getPartitions"+'.'+instances,
+              () -> benchmarkGetPartitions(bench, client, db, tbl, instances))
           .add("getNid", () -> benchmarkGetNotificationId(bench, client))
           .runMatching(patterns);
 

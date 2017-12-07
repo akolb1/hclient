@@ -3,12 +3,13 @@ package com.akolb;
 import com.google.common.base.Joiner;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -60,6 +61,12 @@ final class HMSClient implements AutoCloseable {
   private final String confDir;
   private ThriftHiveMetastore.Iface client;
   private TTransport transport;
+  private URI serverURI;
+
+  @Override
+  public String toString() {
+    return serverURI.toString();
+  }
 
   HMSClient(@Nullable URI uri)
       throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
@@ -87,7 +94,6 @@ final class HMSClient implements AutoCloseable {
    * If principal is specified, create kerberised client.
    *
    * @param uri server uri
-   * @return {@link HiveMetaStoreClient} usable for talking to HMS
    * @throws MetaException        if fails to login using kerberos credentials
    * @throws IOException          if fails connecting to metastore
    * @throws InterruptedException if interrupted during kerberos setup
@@ -101,16 +107,15 @@ final class HMSClient implements AutoCloseable {
     }
 
     // Pick up the first URI from the list of available URIs
-    URI serverURI = uri != null ?
+    serverURI = uri != null ?
         uri :
         new URI(conf.get(METASTORE_URI).split(",")[0]);
-
-    LOG.info("connecting to {}", serverURI);
 
     String principal = conf.get(PRINCIPAL_KEY);
 
     if (principal == null) {
       open(conf, serverURI);
+      return;
     }
 
     LOG.debug("Opening kerberos connection to HMS");
@@ -310,11 +315,12 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  List<Partition> listPartitions(String dbName, String tableName) throws TException {
+  List<Partition> listPartitions(@NotNull String dbName,
+                                 @NotNull String tableName) throws TException {
     return client.get_partitions(dbName, tableName, (short) -1);
   }
 
-  List<Partition> listPartitionsNoException(String dbName, String tableName) {
+  List<Partition> listPartitionsNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
       return listPartitions(dbName, tableName);
     } catch (TException e) {
@@ -323,7 +329,7 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  void addManyPartitions(String dbName, String tableName,
+  void addManyPartitions(@NotNull String dbName, @NotNull String tableName,
                          List<String> arguments, int nPartitions) throws TException {
     Table table = client.get_table(dbName, tableName);
     createPartitions(
@@ -348,11 +354,12 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  List<String> getPartitionNames(String dbName, String tableName) throws TException {
+  List<String> getPartitionNames(@NotNull String dbName,
+                                 @NotNull String tableName) throws TException {
     return client.get_partition_names(dbName, tableName, (short) -1);
   }
 
-  List<String> getPartitionNamesNoException(String dbName, String tableName) {
+  List<String> getPartitionNamesNoException(@NotNull String dbName, @NotNull String tableName) {
     try {
       return getPartitionNames(dbName, tableName);
     } catch (TException e) {
@@ -360,20 +367,14 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  @Override
-  public void close() throws Exception {
-    if ((transport != null) && transport.isOpen()) {
-      LOG.debug("Closing thrift transport");
-      transport.close();
-    }
-  }
-
-  public boolean dropPartition(String dbName, String tableName, List<String> arguments)
+  public boolean dropPartition(@NotNull String dbName, @NotNull String tableName,
+                               @NotNull List<String> arguments)
       throws TException {
     return client.drop_partition(dbName, tableName, arguments, true);
   }
 
-  public boolean dropPartitionNoException(String dbName, String tableName, List<String> arguments) {
+  public boolean dropPartitionNoException(@NotNull String dbName, @NotNull String tableName,
+                                          @NotNull List<String> arguments) {
     try {
       return dropPartition(dbName, tableName, arguments);
     } catch (TException e) {
@@ -381,9 +382,42 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  TTransport open(HiveConf conf, @NotNull URI uri) throws
+  List<Partition> getPartitions(@NotNull String dbName, @NotNull String tableName) throws TException {
+    return client.get_partitions(dbName, tableName, (short)-1);
+  }
+
+  List<Partition> getPartitionsNoException(@NotNull String dbName, @NotNull String tableName) {
+    try {
+      return getPartitions(dbName, tableName);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  void dropPartitions(@NotNull String dbName, @NotNull String tableName,
+                      @Nullable List<String> partNames) throws TException {
+    if (partNames == null) {
+      dropPartitions(dbName, tableName, getPartitionNames(dbName, tableName));
+      return;
+    }
+    if (partNames.isEmpty()) {
+      return;
+    }
+    client.drop_partitions_req(new DropPartitionsRequest(dbName,
+        tableName, RequestPartsSpec.names(partNames)));
+  }
+
+  void dropPartitionsNoException(@NotNull String dbName, @NotNull String tableName,
+                                 @Nullable List<String> names) {
+    try {
+      dropPartitions(dbName, tableName, names);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private TTransport open(HiveConf conf, @NotNull URI uri) throws
       TException, IOException, LoginException {
-    LOG.debug("Connecting to {}", uri);
     boolean useSasl = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL);
     boolean useFramedTransport = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_FRAMED_TRANSPORT);
     boolean useCompactProtocol = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_COMPACT_PROTOCOL);
@@ -434,4 +468,11 @@ final class HMSClient implements AutoCloseable {
     return transport;
   }
 
+  @Override
+  public void close() throws Exception {
+    if ((transport != null) && transport.isOpen()) {
+      LOG.debug("Closing thrift transport");
+      transport.close();
+    }
+  }
 }

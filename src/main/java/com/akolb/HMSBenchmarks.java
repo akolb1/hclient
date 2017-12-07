@@ -5,6 +5,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,14 +145,29 @@ class HMSBenchmarks {
     try {
       client.addManyPartitions(dbName, tableName,
           Collections.singletonList("d"), howMany);
-      LOG.info("Created {} partitions", howMany);
-      LOG.info("starting benchmark... ");
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-      }
-      LOG.info("started benchmark... ");
+      LOG.debug("Created {} partitions", howMany);
+      LOG.debug("started benchmark... ");
       return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
+    } catch (TException e) {
+      e.printStackTrace();
+      return new DescriptiveStatistics();
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
+  static DescriptiveStatistics benchmarkGetPartitions(final MicroBenchmark bench,
+                                                      final HMSClient client,
+                                                      final String dbName,
+                                                      final String tableName,
+                                                      int howMany) {
+    createPartitionedTable(client, dbName, tableName);
+    try {
+      client.addManyPartitions(dbName, tableName,
+          Collections.singletonList("d"), howMany);
+      LOG.debug("Created {} partitions", howMany);
+      LOG.debug("started benchmark... ");
+      return bench.measure(() -> client.getPartitionsNoException(dbName, tableName));
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
