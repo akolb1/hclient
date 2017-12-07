@@ -65,6 +65,10 @@ public class BenchmarkSuite {
     this.doSanitize = doSanitize;
   }
 
+  public Map<String, DescriptiveStatistics> getResult() {
+    return result;
+  }
+
   public List<String> list(@Nullable List<String> patterns) {
     if (patterns == null || patterns.isEmpty()) {
       return benchmarks;

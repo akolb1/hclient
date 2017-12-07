@@ -8,14 +8,22 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
 import java.util.List;
+import java.util.Map;
 
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
@@ -57,6 +65,8 @@ class HMSBenchmark {
   private static final String OPT_SANITIZE = "sanitize";
   private static final String OPT_OUTPUT = "output";
   private static final String OPT_CSV = "csv";
+  private static final String OPT_SAVEDATA = "savedata";
+
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
@@ -74,6 +84,8 @@ class HMSBenchmark {
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SANITIZE, false, "sanitize results"))
         .addOption(new Option(OPT_CSV, false, "produce CSV output"))
+        .addOption(new Option(OPT_SAVEDATA, true,
+            "save raw data in specified dir"))
         .addOption("S", OPT_PATTERN, true, "test patterns");
 
     CommandLineParser parser = new DefaultParser();
@@ -166,8 +178,38 @@ class HMSBenchmark {
         result.display();
       }
 
+      if (cmd.hasOption(OPT_SAVEDATA)) {
+        saveData(result.getResult(), cmd.getOptionValue(OPT_SAVEDATA), scale);
+      }
+
       output.print(sb.toString());
     }
+  }
+
+  private static void saveData(Map<String,
+      DescriptiveStatistics> result, String location, long scale) throws IOException {
+    Path dir = Paths.get(location);
+    if (!Files.exists(dir)) {
+      LOG.debug("creating directory {}", location);
+      Files.createDirectories(dir);
+    } else if (!Files.isDirectory(dir)) {
+      LOG.error("{} should be a directory", location);
+    }
+
+    // Create a new file for each benchmark and dump raw data to it.
+    result.forEach((name, data) -> saveDataFile(location, name, data, scale));
+  }
+
+  private static void saveDataFile(String location, String name,
+                                   DescriptiveStatistics data, long scale) {
+    Path dst = Paths.get(location, name);
+    try (PrintStream output = new PrintStream(dst.toString())) {
+      // Print all values one per line
+      Arrays.stream(data.getValues()).forEach(d -> output.println(d / scale));
+    } catch (FileNotFoundException e) {
+      LOG.error("failed to write to {}", dst.toString());
+    }
+
   }
 
   private static void help(Options options) {

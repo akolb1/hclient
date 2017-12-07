@@ -185,7 +185,8 @@ class HMSBenchmarks {
     try {
       Table t = client.getTable(dbName, tableName);
       Partition partition = HMSClient.makePartition(t, values);
-      return bench.measure(() -> client.createPartitionNoException(partition),
+      return bench.measure(
+          () -> client.createPartitionNoException(partition),
           () -> client.dropPartitionNoException(dbName, tableName, values),
           null);
     } catch (TException e) {
