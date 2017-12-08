@@ -1,22 +1,15 @@
 package com.akolb;
 
-import com.google.common.base.Joiner;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
-import org.apache.hadoop.hive.metastore.api.SerDeInfo;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
-import org.apache.hadoop.hive.ql.io.HiveInputFormat;
-import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge;
@@ -41,13 +34,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+
+import static com.akolb.Util.makePartition;
 
 final class HMSClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
@@ -241,69 +234,11 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  /**
-   * Create Table objects
-   *
-   * @param dbName    database name
-   * @param tableName table name
-   * @param columns   table schema
-   * @return Table object
-   */
-  static @NotNull
-  Table makeTable(@NotNull String dbName, @NotNull String tableName,
-                  @Nullable List<FieldSchema> columns,
-                  @Nullable List<FieldSchema> partitionKeys) {
-    StorageDescriptor sd = new StorageDescriptor();
-    if (columns == null) {
-      sd.setCols(Collections.emptyList());
-    } else {
-      sd.setCols(columns);
-    }
-    SerDeInfo serdeInfo = new SerDeInfo();
-    serdeInfo.setSerializationLib(LazySimpleSerDe.class.getName());
-    serdeInfo.setName(tableName);
-    sd.setSerdeInfo(serdeInfo);
-    sd.setInputFormat(HiveInputFormat.class.getName());
-    sd.setOutputFormat(HiveOutputFormat.class.getName());
-
-    Table table = new Table();
-    table.setDbName(dbName);
-    table.setTableName(tableName);
-    table.setSd(sd);
-    if (partitionKeys != null) {
-      table.setPartitionKeys(partitionKeys);
-    }
-
-    return table;
-  }
-
-  static @NotNull
-  Partition makePartition(@NotNull Table table, @NotNull List<String> values) {
-    Partition partition = new Partition();
-    List<String> partitionNames = table.getPartitionKeys()
-        .stream()
-        .map(FieldSchema::getName)
-        .collect(Collectors.toList());
-    if (partitionNames.size() != values.size()) {
-      throw new RuntimeException("Partition values do not match table schema");
-    }
-    List<String> spec = IntStream.range(0, values.size())
-        .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
-        .collect(Collectors.toList());
-
-    partition.setDbName(table.getDbName());
-    partition.setTableName(table.getTableName());
-    partition.setValues(values);
-    partition.setSd(table.getSd().deepCopy());
-    partition.getSd().setLocation(table.getSd().getLocation() + "/" + Joiner.on("/").join(spec));
-    return partition;
-  }
-
   void createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
     client.add_partition(makePartition(table, values));
   }
 
-  private void createPartitions(List<Partition> partitions) throws TException {
+  void createPartitions(List<Partition> partitions) throws TException {
     client.add_partitions(partitions);
   }
 
@@ -327,19 +262,6 @@ final class HMSClient implements AutoCloseable {
       LOG.error("Failed to list partitions", e);
       throw new RuntimeException(e);
     }
-  }
-
-  void addManyPartitions(@NotNull String dbName, @NotNull String tableName,
-                         List<String> arguments, int nPartitions) throws TException {
-    Table table = client.get_table(dbName, tableName);
-    createPartitions(
-        IntStream.range(0, nPartitions)
-            .mapToObj(i ->
-                makePartition(table,
-                    arguments.stream()
-                        .map(a -> a + i)
-                        .collect(Collectors.toList())))
-            .collect(Collectors.toList()));
   }
 
   long getCurrentNotificationId() throws TException {

@@ -8,30 +8,26 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static com.akolb.Util.addManyPartitions;
+import static com.akolb.Util.createSchema;
+import static com.akolb.Util.getServerUri;
+import static com.akolb.Util.makeTable;
+
 class Main {
   private static final Logger LOG = LoggerFactory.getLogger(Main.class);
   // Default column type
-  private static final String DEFAULT_TYPE = "string";
-  private static final String TYPE_SEPARATOR = ":";
-
   private static final String DEFAULT_HOST = "localhost";
-  private static final String THRIFT_SCHEMA = "thrift";
-  private static final int DEFAULT_PORT = 9083;
 
   private static final String DBNAME = "default";
 
@@ -152,7 +148,7 @@ class Main {
               }
             }
 
-            client.createTable(HMSClient.makeTable(dbName, tableName,
+            client.createTable(makeTable(dbName, tableName,
                 createSchema(arguments),
                 createSchema(partitionInfo)));
             LOG.info("Created table '" + tableName + "'");
@@ -171,7 +167,7 @@ class Main {
                 }
               }
 
-              client.createTable(HMSClient.makeTable(dbName, tbl,
+              client.createTable(makeTable(dbName, tbl,
                   createSchema(arguments),
                   createSchema(partitionInfo)));
               tables.add(tbl);
@@ -186,7 +182,7 @@ class Main {
           }
           if (cmd.hasOption(OPT_NUMBER)) {
             int nPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
-            client.addManyPartitions(dbName, tableName, arguments, nPartitions);
+            addManyPartitions(client, dbName, tableName, arguments, nPartitions);
           } else {
             addPartition(client, dbName, tableName, arguments);
           }
@@ -220,47 +216,6 @@ class Main {
     HelpFormatter formater = new HelpFormatter();
     formater.printHelp("hclient list|create|addpart <options> [name:type...]", options);
     System.exit(0);
-  }
-
-  static @Nullable URI getServerUri(@Nullable String host) {
-    if (host == null) {
-      return null;
-    }
-
-    try {
-      return new URI(THRIFT_SCHEMA, null, host, DEFAULT_PORT,
-          null, null, null);
-    } catch (URISyntaxException e) {
-      e.printStackTrace();
-      System.exit(1);
-    }
-    return null;
-  }
-
-  /**
-   * Create table schema from parameters
-   *
-   * @param params list of parameters. Each parameter can be either a simple name or
-   *               name:type for non-String types.
-   * @return table schema description
-   */
-  static List<FieldSchema> createSchema(List<String> params) {
-    if (params == null || params.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    ArrayList<FieldSchema> cols = new ArrayList<>(params.size());
-    for (String param : params) {
-      String colType = DEFAULT_TYPE;
-      String name = param;
-      if (param.contains(TYPE_SEPARATOR)) {
-        String[] parts = param.split(TYPE_SEPARATOR);
-        name = parts[0];
-        colType = parts[1].toLowerCase();
-      }
-      cols.add(new FieldSchema(name, colType, ""));
-    }
-    return cols;
   }
 
   private static void cmdDisplayTables(HMSClient client, CommandLine cmd) throws TException {

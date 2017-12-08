@@ -26,8 +26,10 @@ import java.util.List;
 import java.util.Map;
 
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
+import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
+import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
 import static com.akolb.HMSBenchmarks.benchmarkGetPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetTable;
@@ -37,6 +39,7 @@ import static com.akolb.HMSBenchmarks.benchmarkListManyPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkListPartition;
 import static com.akolb.HMSBenchmarks.benchmarkListTables;
 import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
+
 import static com.akolb.Main.OPT_CONF;
 import static com.akolb.Main.OPT_DATABASE;
 import static com.akolb.Main.OPT_HOST;
@@ -44,7 +47,7 @@ import static com.akolb.Main.OPT_NUMBER;
 import static com.akolb.Main.OPT_PARTITIONS;
 import static com.akolb.Main.OPT_PATTERN;
 import static com.akolb.Main.OPT_VERBOSE;
-import static com.akolb.Main.getServerUri;
+import static com.akolb.Util.getServerUri;
 
     /*
      * TODO support saving raw data to files
@@ -170,6 +173,10 @@ class HMSBenchmark {
           .add("getPartitions"+'.'+instances,
               () -> benchmarkGetPartitions(bench, client, db, tbl, instances))
           .add("getNid", () -> benchmarkGetNotificationId(bench, client))
+          .add("addPartitions"+'.'+instances,
+              () -> benchmarkCreatePartitions(bench, client, db, tbl, instances))
+          .add("dropPartitions"+'.'+instances,
+              () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
