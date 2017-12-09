@@ -5,6 +5,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.DropPartitionsRequest;
+import org.apache.hadoop.hive.metastore.api.DropPartitionsResult;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.RequestPartsSpec;
@@ -316,16 +317,15 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
-  void dropPartitions(@NotNull String dbName, @NotNull String tableName,
-                      @Nullable List<String> partNames) throws TException {
+  DropPartitionsResult dropPartitions(@NotNull String dbName, @NotNull String tableName,
+                                      @Nullable List<String> partNames) throws TException {
     if (partNames == null) {
-      dropPartitions(dbName, tableName, getPartitionNames(dbName, tableName));
-      return;
+      return dropPartitions(dbName, tableName, getPartitionNames(dbName, tableName));
     }
     if (partNames.isEmpty()) {
-      return;
+      return null;
     }
-    client.drop_partitions_req(new DropPartitionsRequest(dbName,
+    return client.drop_partitions_req(new DropPartitionsRequest(dbName,
         tableName, RequestPartsSpec.names(partNames)));
   }
 

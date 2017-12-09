@@ -1,5 +1,6 @@
 package com.akolb;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -50,9 +51,8 @@ import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Util.getServerUri;
 
     /*
-     * TODO support saving raw data to files
-     * TODO support CSV output
-     * TODO support saving results to file
+     * TODO Also show results on stdout when saved to file
+     * TODO Integrate metrics
      */
 
 class HMSBenchmark {
@@ -94,6 +94,8 @@ class HMSBenchmark {
     CommandLineParser parser = new DefaultParser();
 
     CommandLine cmd = null;
+
+    LOG.info("using args {}", Joiner.on(' ').join(args));
 
     try {
       cmd = parser.parse(options, args);
@@ -155,7 +157,6 @@ class HMSBenchmark {
       // Arrange various benchmarks in a suite
       BenchmarkSuite result = suite
           .setScale(scale)
-          .setFmt(fmt)
           .add("listDatabases", () -> benchmarkListDatabases(bench, client))
           .add("listTables", () -> benchmarkListAllTables(bench, client, db))
           .add("listTables"+'.'+instances,
@@ -180,16 +181,27 @@ class HMSBenchmark {
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
-        result.displayCSV(CSV_SEPARATOR);
+        result.displayCSV(fmt, CSV_SEPARATOR);
       } else {
-        result.display();
+        result.display(fmt);
       }
+
+      if (cmd.hasOption(OPT_OUTPUT)) {
+        // Print results to stdout as well
+        StringBuilder s = new StringBuilder();
+        Formatter f = new Formatter(sb);
+        result.display(f);
+        System.out.print(s);
+        f.close();
+      }
+
+      output.print(sb.toString());
+      fmt.close();
 
       if (cmd.hasOption(OPT_SAVEDATA)) {
         saveData(result.getResult(), cmd.getOptionValue(OPT_SAVEDATA), scale);
       }
 
-      output.print(sb.toString());
     }
   }
 

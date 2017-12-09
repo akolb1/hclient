@@ -35,7 +35,6 @@ public class BenchmarkSuite {
   private final boolean doSanitize;
   private long scale = 1;
   private double minMean = 0;
-  private Formatter fmt;
 
   /**
    * Create new benchmark suite without data sanitizing
@@ -46,11 +45,6 @@ public class BenchmarkSuite {
 
   BenchmarkSuite setScale(long scale) {
     this.scale = scale;
-    return this;
-  }
-
-  BenchmarkSuite setFmt(Formatter fmt) {
-    this.fmt = fmt;
     return this;
   }
 
@@ -159,7 +153,7 @@ public class BenchmarkSuite {
     return new DescriptiveStatistics(data).getMin();
   }
 
-  private void displayStats(String name, DescriptiveStatistics stats) {
+  private void displayStats(Formatter fmt, String name, DescriptiveStatistics stats) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
 
@@ -173,7 +167,7 @@ public class BenchmarkSuite {
         err);
   }
 
-  private void displayCSV(String name, DescriptiveStatistics stats, String separator) {
+  private void displayCSV(Formatter fmt, String name, DescriptiveStatistics stats, String separator) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
 
@@ -187,20 +181,20 @@ public class BenchmarkSuite {
         err);
   }
 
-  BenchmarkSuite display() {
+  BenchmarkSuite display(Formatter fmt) {
     fmt.format("%-30s %-6s %-6s %-6s %-6s %-6s %-6s%n",
         "Operation", "AMean", "Mean", "Med", "Min", "Max", "Err%");
     minMean = minMean();
-    result.forEach(this::displayStats);
+    result.forEach((name, stat) -> displayStats(fmt, name, stat));
     return this;
   }
 
-  BenchmarkSuite displayCSV(String separator) {
+  BenchmarkSuite displayCSV(Formatter fmt, String separator) {
     fmt.format("%s%s%s%s%6s%s%s%s%s%s%s%s%s%n",
         "Operation", separator, "AMean", separator, "Mean", separator, "Med", separator, "Min",
         separator, "Max", separator, "Err%");
     minMean = minMean();
-    result.forEach((name, s) -> displayCSV(name, s, separator));
+    result.forEach((name, s) -> displayCSV(fmt, name, s, separator));
     return this;
   }
 }
