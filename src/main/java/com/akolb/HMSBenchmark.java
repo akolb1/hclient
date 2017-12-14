@@ -178,7 +178,7 @@ class HMSBenchmark {
               () -> benchmarkGetPartitions(bench, client, db, tbl, instances))
           .add("getPartitionNames",
               () -> benchmarkGetPartitionNames(bench, client, db, tbl, 1))
-          .add("getPartitionsByNames" + '.' + instances,
+          .add("getPartitionNames" + '.' + instances,
               () -> benchmarkGetPartitionNames(bench, client, db, tbl, instances))
           .add("getPartitionsByNames",
               () -> benchmarkGetPartitionsByName(bench, client, db, tbl, 1))
