@@ -60,13 +60,13 @@ import static com.akolb.HMSBenchmarks.benchmarkListManyPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkListPartition;
 import static com.akolb.HMSBenchmarks.benchmarkListTables;
 import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
-import static com.akolb.Main.OPT_CONF;
-import static com.akolb.Main.OPT_DATABASE;
-import static com.akolb.Main.OPT_HOST;
-import static com.akolb.Main.OPT_NUMBER;
-import static com.akolb.Main.OPT_PARTITIONS;
-import static com.akolb.Main.OPT_PATTERN;
-import static com.akolb.Main.OPT_VERBOSE;
+import static com.akolb.HMSTool.OPT_CONF;
+import static com.akolb.HMSTool.OPT_DATABASE;
+import static com.akolb.HMSTool.OPT_HOST;
+import static com.akolb.HMSTool.OPT_NUMBER;
+import static com.akolb.HMSTool.OPT_PARTITIONS;
+import static com.akolb.HMSTool.OPT_PATTERN;
+import static com.akolb.HMSTool.OPT_VERBOSE;
 import static com.akolb.Util.getServerUri;
 
 /*

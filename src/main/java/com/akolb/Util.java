@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.akolb;
 
 import com.google.common.base.Joiner;
@@ -143,10 +144,11 @@ class Util {
   static void addManyPartitions(@NotNull HMSClient client,
                                 @NotNull String dbName,
                                 @NotNull String tableName,
-                                List<String> arguments, int nPartitions) throws TException {
+                                List<String> arguments,
+                                int npartitions) throws TException {
     Table table = client.getTable(dbName, tableName);
     client.createPartitions(
-        IntStream.range(0, nPartitions)
+        IntStream.range(0, npartitions)
             .mapToObj(i ->
                 makePartition(table,
                     arguments.stream()
@@ -156,11 +158,12 @@ class Util {
   }
 
   static void addManyPartitionsNoException(@NotNull HMSClient client,
-                                @NotNull String dbName,
-                                @NotNull String tableName,
-                                List<String> arguments, int nPartitions) {
+                                           @NotNull String dbName,
+                                           @NotNull String tableName,
+                                           List<String> arguments,
+                                           int npartitions) {
     try {
-      addManyPartitions(client, dbName, tableName, arguments, nPartitions);
+      addManyPartitions(client, dbName, tableName, arguments, npartitions);
     } catch (TException e) {
       throw new RuntimeException(e);
     }

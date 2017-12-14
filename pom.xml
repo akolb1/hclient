@@ -67,7 +67,7 @@
                         <configuration>
                             <archive>
                                 <manifest>
-                                    <mainClass>com.akolb.Main</mainClass>
+                                    <mainClass>com.akolb.HMSTool</mainClass>
                                     <addClasspath>true</addClasspath>
                                 </manifest>
                             </archive>
@@ -126,7 +126,6 @@
                 <version>3.8</version>
                 <configuration>
                     <minimumTokens>100</minimumTokens>
-                    <maximumStaticImports>0</maximumStaticImports>
                     <targetJdk>1.8</targetJdk>
                     <excludes>
                         <exclude>**/*Bean.java</exclude>

@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-MAIN=com.akolb.Main
+MAIN=com.akolb.HMSTool
 myhome=$(git rev-parse --show-toplevel)
 JAR=hclient-1.0-SNAPSHOT-jar-with-dependencies.jar
 JAR_PATH=${myhome}/target/${JAR}
