@@ -32,49 +32,45 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * Run a set of benchmarks as a suite.
- * Every benchmark has an associated name. Caller can either run all benchmarks
- * or only ones matching the filter.
+ * Group of benchmarks that can be joined together.
+ * Every benchmark has an associated name.
+ * Caller can either run all benchmarks or only ones matching the filter.
  */
-public class BenchmarkSuite {
+public final class BenchmarkSuite {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class);
   // Delta margin for data sanitizing
-  private final static double MARGIN = 2;
+  private static final double MARGIN = 2;
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
   // List of benchmarks. All benchmarks are executed in the order
   // they are inserted
   private final List<String> benchmarks = new ArrayList<>();
   private final Map<String, DescriptiveStatistics> result = new TreeMap<>();
-  private final boolean doSanitize;
-  private long scale = 1;
+  private boolean doSanitize = false;
+  private TimeUnit scale = TimeUnit.MILLISECONDS;
   private double minMean = 0;
 
   /**
-   * Create new benchmark suite without data sanitizing
+   * Set scaling factor for displaying results.
+   * When data is reported, all times are divided by scale functor.
+   * Data is always collected in nanoseconds, so this can be used to present
+   * data using different time units.
+   * @param scale
+   * @return this for chaining
    */
-  public BenchmarkSuite() {
-    this(false);
-  }
-
-  BenchmarkSuite setScale(long scale) {
+  BenchmarkSuite setScale(TimeUnit scale) {
     this.scale = scale;
     return this;
   }
 
-  /**
-   * Create new benchmark suite.<p>
-   * <p>
-   * The suite can run multiple benchmarks.
-   *
-   * @param doSanitize Sanitize data if true
-   */
-  BenchmarkSuite(boolean doSanitize) {
-    this.doSanitize = doSanitize;
+  BenchmarkSuite doSanitize(boolean sanitize) {
+    this.doSanitize = sanitize;
+    return this;
   }
 
   public Map<String, DescriptiveStatistics> getResult() {
@@ -174,28 +170,31 @@ public class BenchmarkSuite {
   private void displayStats(Formatter fmt, String name, DescriptiveStatistics stats) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
+    long conv = scale.toNanos(1);
+    LOG.info("using conversion {}", conv);
 
     fmt.format("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
         name,
-        (mean - minMean) / scale,
-        mean / scale,
-        median(stats) / scale,
-        stats.getMin() / scale,
-        stats.getMax() / scale,
+        (mean - minMean) / conv,
+        mean / conv,
+        median(stats) / conv,
+        stats.getMin() / conv,
+        stats.getMax() / conv,
         err);
   }
 
   private void displayCSV(Formatter fmt, String name, DescriptiveStatistics stats, String separator) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
+    long conv = scale.toNanos(1);
 
     fmt.format("%s%s%g%s%g%s%g%s%g%s%g%s%g%n",
         name, separator,
-        (mean - minMean) / scale, separator,
-        mean / scale, separator,
-        median(stats) / scale, separator,
-        stats.getMin() / scale, separator,
-        stats.getMax() / scale, separator,
+        (mean - minMean) / conv, separator,
+        mean / conv, separator,
+        median(stats) / conv, separator,
+        stats.getMin() / conv, separator,
+        stats.getMax() / conv, separator,
         err);
   }
 

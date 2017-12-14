@@ -43,6 +43,7 @@ import java.util.Collections;
 import java.util.Formatter;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
@@ -75,9 +76,9 @@ import static com.akolb.Util.getServerUri;
  * TODO Wrap DescriptiveStatistics into a timer class with start/stop methods
  */
 
-class HMSBenchmark {
+final class HMSBenchmark {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
-  private static final long scale = ChronoUnit.MILLIS.getDuration().getNano();
+  private static final TimeUnit scale = TimeUnit.MILLISECONDS;
   private static final String CSV_SEPARATOR = "\t";
   private static final String TEST_TABLE = "bench_table";
 
@@ -172,11 +173,12 @@ class HMSBenchmark {
       Formatter fmt = new Formatter(sb);
 
       MicroBenchmark bench = new MicroBenchmark(warmup, spin);
-      BenchmarkSuite suite = new BenchmarkSuite(cmd.hasOption(OPT_SANITIZE));
+      BenchmarkSuite suite = new BenchmarkSuite();
 
       // Arrange various benchmarks in a suite
       BenchmarkSuite result = suite
           .setScale(scale)
+          .doSanitize(cmd.hasOption(OPT_SANITIZE))
           .add("getNid", () -> benchmarkGetNotificationId(bench, client))
           .add("listDatabases", () -> benchmarkListDatabases(bench, client))
           .add("listTables", () -> benchmarkListAllTables(bench, client, db))
@@ -234,7 +236,7 @@ class HMSBenchmark {
   }
 
   private static void saveData(Map<String,
-      DescriptiveStatistics> result, String location, long scale) throws IOException {
+      DescriptiveStatistics> result, String location, TimeUnit scale) throws IOException {
     Path dir = Paths.get(location);
     if (!Files.exists(dir)) {
       LOG.debug("creating directory {}", location);
@@ -248,11 +250,12 @@ class HMSBenchmark {
   }
 
   private static void saveDataFile(String location, String name,
-                                   DescriptiveStatistics data, long scale) {
+                                   DescriptiveStatistics data, TimeUnit scale) {
+    long conv = scale.toNanos(1);
     Path dst = Paths.get(location, name);
     try (PrintStream output = new PrintStream(dst.toString())) {
       // Print all values one per line
-      Arrays.stream(data.getValues()).forEach(d -> output.println(d / scale));
+      Arrays.stream(data.getValues()).forEach(d -> output.println(d / conv));
     } catch (FileNotFoundException e) {
       LOG.error("failed to write to {}", dst.toString());
     }

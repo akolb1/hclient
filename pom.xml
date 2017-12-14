@@ -105,23 +105,6 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.17</version>
-                <configuration>
-                    <configLocation>${checkstyle.conf.dir}/checkstyle.xml</configLocation>
-                    <propertyExpansion>basedir=${checkstyle.conf.dir}</propertyExpansion>
-                </configuration>
-                <dependencies>
-                    <!-- https://mvnrepository.com/artifact/com.puppycrawl.tools/checkstyle -->
-                    <dependency>
-                        <groupId>com.puppycrawl.tools</groupId>
-                        <artifactId>checkstyle</artifactId>
-                        <version>8.5</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-pmd-plugin</artifactId>
                 <version>3.8</version>
                 <configuration>
@@ -142,21 +125,6 @@
     <reporting>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <configuration>
-                    <configLocation>${checkstyle.conf.dir}/checkstyle.xml</configLocation>
-                    <propertyExpansion>basedir=${checkstyle.conf.dir}</propertyExpansion>
-                </configuration>
-                <reportSets>
-                    <reportSet>
-                        <reports>
-                            <report>checkstyle</report>
-                        </reports>
-                    </reportSet>
-                </reportSets>
-            </plugin>
-            <plugin>
                 <!-- This is needed for checkstyle -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jxr-plugin</artifactId>
@@ -168,7 +136,6 @@
                 <version>3.8</version>
                 <configuration>
                     <minimumTokens>100</minimumTokens>
-                    <maximumStaticImports>0</maximumStaticImports>
                     <targetJdk>1.8</targetJdk>
                     <excludes>
                         <exclude>**/*Bean.java</exclude>
@@ -231,12 +198,6 @@
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
             <version>15.0</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-checkstyle-plugin -->
-        <dependency>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <version>2.17</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.maven.plugins/maven-jxr-plugin -->
         <dependency>
