@@ -338,6 +338,24 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
+  List<Partition> getPartitionsByNames(@NotNull String dbName, @NotNull String tableName,
+                                       @Nullable List<String>names) throws TException {
+    if (names == null) {
+      return client.get_partitions_by_names(dbName, tableName,
+          getPartitionNames(dbName, tableName));
+    }
+    return client.get_partitions_by_names(dbName, tableName, names);
+  }
+
+  List<Partition> getPartitionsByNamesNoException(@NotNull String dbName, @NotNull String tableName,
+                                                  @Nullable List<String>names) {
+    try {
+      return getPartitionsByNames(dbName, tableName, names);
+    } catch (TException e) {
+      throw  new RuntimeException(e);
+    }
+  }
+
   private TTransport open(HiveConf conf, @NotNull URI uri) throws
       TException, IOException, LoginException {
     boolean useSasl = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL);

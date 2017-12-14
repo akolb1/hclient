@@ -32,7 +32,9 @@ import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
+import static com.akolb.HMSBenchmarks.benchmarkGetPartitionNames;
 import static com.akolb.HMSBenchmarks.benchmarkGetPartitions;
+import static com.akolb.HMSBenchmarks.benchmarkGetPartitionsByName;
 import static com.akolb.HMSBenchmarks.benchmarkGetTable;
 import static com.akolb.HMSBenchmarks.benchmarkListAllTables;
 import static com.akolb.HMSBenchmarks.benchmarkListDatabases;
@@ -40,7 +42,6 @@ import static com.akolb.HMSBenchmarks.benchmarkListManyPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkListPartition;
 import static com.akolb.HMSBenchmarks.benchmarkListTables;
 import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
-
 import static com.akolb.Main.OPT_CONF;
 import static com.akolb.Main.OPT_DATABASE;
 import static com.akolb.Main.OPT_HOST;
@@ -50,10 +51,11 @@ import static com.akolb.Main.OPT_PATTERN;
 import static com.akolb.Main.OPT_VERBOSE;
 import static com.akolb.Util.getServerUri;
 
-    /*
-     * TODO Also show results on stdout when saved to file
-     * TODO Integrate metrics
-     */
+/*
+ * TODO Also show results on stdout when saved to file
+ * TODO Integrate metrics
+ * TODO Wrap DescriptiveStatistics into a timer class with start/stop methods
+ */
 
 class HMSBenchmark {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
@@ -157,9 +159,10 @@ class HMSBenchmark {
       // Arrange various benchmarks in a suite
       BenchmarkSuite result = suite
           .setScale(scale)
+          .add("getNid", () -> benchmarkGetNotificationId(bench, client))
           .add("listDatabases", () -> benchmarkListDatabases(bench, client))
           .add("listTables", () -> benchmarkListAllTables(bench, client, db))
-          .add("listTables"+'.'+instances,
+          .add("listTables" + '.' + instances,
               () -> benchmarkListTables(bench, client, db, instances))
           .add("getTable", () -> benchmarkGetTable(bench, client, db, tbl))
           .add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl))
@@ -167,16 +170,23 @@ class HMSBenchmark {
           .add("addPartition", () -> benchmarkCreatePartition(bench, client, db, tbl))
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
-          .add("listPartitions"+'.'+instances,
+          .add("listPartitions" + '.' + instances,
               () -> benchmarkListManyPartitions(bench, client, db, tbl, instances))
           .add("getPartition",
               () -> benchmarkGetPartitions(bench, client, db, tbl, 1))
-          .add("getPartitions"+'.'+instances,
+          .add("getPartitions" + '.' + instances,
               () -> benchmarkGetPartitions(bench, client, db, tbl, instances))
-          .add("getNid", () -> benchmarkGetNotificationId(bench, client))
-          .add("addPartitions"+'.'+instances,
+          .add("getPartitionNames",
+              () -> benchmarkGetPartitionNames(bench, client, db, tbl, 1))
+          .add("getPartitionsByNames" + '.' + instances,
+              () -> benchmarkGetPartitionNames(bench, client, db, tbl, instances))
+          .add("getPartitionsByNames",
+              () -> benchmarkGetPartitionsByName(bench, client, db, tbl, 1))
+          .add("getPartitionsByNames" + '.' + instances,
+              () -> benchmarkGetPartitionsByName(bench, client, db, tbl, instances))
+          .add("addPartitions" + '.' + instances,
               () -> benchmarkCreatePartitions(bench, client, db, tbl, instances))
-          .add("dropPartitions"+'.'+instances,
+          .add("dropPartitions" + '.' + instances,
               () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
           .runMatching(patterns);
 

@@ -233,6 +233,41 @@ class HMSBenchmarks {
     }
   }
 
+  static DescriptiveStatistics benchmarkGetPartitionNames(MicroBenchmark bench,
+                                                          final HMSClient client,
+                                                          final String dbName,
+                                                          final String tableName,
+                                                          int count) {
+    createPartitionedTable(client, dbName, tableName);
+    try {
+      addManyPartitionsNoException(client, dbName, tableName,
+          Collections.singletonList("d"), count);
+      return bench.measure(
+          () -> client.getPartitionNamesNoException(dbName, tableName)
+      );
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
+  static DescriptiveStatistics benchmarkGetPartitionsByName(MicroBenchmark bench,
+                                                            final HMSClient client,
+                                                            final String dbName,
+                                                            final String tableName,
+                                                            int count) {
+    createPartitionedTable(client, dbName, tableName);
+    try {
+      addManyPartitionsNoException(client, dbName, tableName,
+          Collections.singletonList("d"), count);
+      List<String> partitionNames = client.getPartitionNamesNoException(dbName, tableName);
+      return bench.measure(
+          () -> client.getPartitionsByNamesNoException(dbName, tableName, partitionNames)
+      );
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
   private static void createManyTables(HMSClient client, int howMany, String dbName, String format) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
