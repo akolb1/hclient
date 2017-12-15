@@ -2,19 +2,38 @@ Simple CLI client for HMS Metastore.
 
 #Usage
 
-     usage: hclient list|create <options> [name:type...]
-      -d,--database <arg>     database name (can be regexp for list)
-      -D,--drop               drop table if exists
-      -h,--help               print this info
-      -N,--number <arg>       number of instances
-      -p,--port <arg>         port
-      -P,--partitions <arg>   partitions list
-      -H,--server <arg>       HMS Server
-      -S,--pattern <arg>      table name pattern for bulk creation
-      -t,--table <arg>        table name (can be regexp for list)
-      -v,--verbose            verbose mode
+    usage: hclient list|create|addpart <options> [name:type...]
+     -conf <arg>             configuration directory
+     -d,--database <arg>     database name (can be regexp for list)
+     -D,--drop               drop table if exists
+     -H,--host <arg>         HMS Server
+     -h,--help               print this info
+     -N,--number <arg>       number of instances
+     -P,--partitions <arg>   partitions list
+     -S,--pattern <arg>      table name pattern for bulk creation
+     -showparts              show partitions
+     -t,--table <arg>        table name (can be regexp for list)
+     -v,--verbose            verbose mode
 
-     
+
+     usage: hbench ...
+      -conf <arg>             configuration directory
+      -csv                    produce CSV output
+      -d,--database <arg>     database name (can be regexp for list)
+      -H,--host <arg>         HMS Server
+      -h,--help               print this info
+      -K,--separator <arg>    field separator
+      -L,--spin <arg>         spin count
+      -l,--list <arg>         list benchmarks
+      -N,--number <arg>       number of instances
+      -o,--output <arg>       output file
+      -P,--partitions <arg>   partitions list
+      -S,--pattern <arg>      test patterns
+      -sanitize               sanitize results
+      -savedata <arg>         save raw data in specified dir
+      -v,--verbose            verbose mode
+      -W,--warm <arg>         warmup count
+
      
 
 # Examples
