@@ -219,7 +219,7 @@ final class HMSBenchmark {
       if (cmd.hasOption(OPT_OUTPUT)) {
         // Print results to stdout as well
         StringBuilder s = new StringBuilder();
-        Formatter f = new Formatter(sb);
+        Formatter f = new Formatter(s);
         result.display(f);
         System.out.print(s);
         f.close();
