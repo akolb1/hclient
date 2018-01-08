@@ -421,6 +421,7 @@ final class HMSClient implements AutoCloseable {
     if (!useSasl && conf.getBoolVar(HiveConf.ConfVars.METASTORE_EXECUTE_SET_UGI)) {
       UserGroupInformation ugi = Utils.getUGI();
       client.set_ugi(ugi.getUserName(), Arrays.asList(ugi.getGroupNames()));
+      LOG.debug("Set UGI for {}", ugi.getUserName());
     }
     LOG.debug("Connected to metastore, using compact protocol = {}", useCompactProtocol);
     return transport;

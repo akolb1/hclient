@@ -171,7 +171,6 @@ public final class BenchmarkSuite {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
-    LOG.info("using conversion {}", conv);
 
     fmt.format("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
         name,

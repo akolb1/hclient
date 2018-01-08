@@ -122,7 +122,6 @@ final class HMSBenchmark {
       cmd = parser.parse(options, args);
     } catch (ParseException e) {
       help(options);
-      System.exit(1);
     }
 
     if (cmd.hasOption("help")) {

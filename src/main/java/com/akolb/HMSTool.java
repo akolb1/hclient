@@ -31,6 +31,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.hive.common.LogUtils;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -40,6 +41,8 @@ import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
 import static com.akolb.Util.makeTable;
+
+// TODO Handle HADOOP_CONF_DIR and HADOOP_HOME
 
 /**
  * Command-line Hive metastore tool.
@@ -114,6 +117,8 @@ final class HMSTool {
     List<String> partitionInfo = partitions == null ?
         Collections.emptyList() :
         new ArrayList<>(Arrays.asList(partitions));
+
+    LogUtils.initHiveLog4j();
 
     try (HMSClient client =
              new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)),
