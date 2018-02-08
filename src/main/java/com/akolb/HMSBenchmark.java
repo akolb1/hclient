@@ -37,7 +37,6 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
@@ -48,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
+import static com.akolb.HMSBenchmarks.benchmarkDropDatabase;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
@@ -60,6 +60,7 @@ import static com.akolb.HMSBenchmarks.benchmarkListDatabases;
 import static com.akolb.HMSBenchmarks.benchmarkListManyPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkListPartition;
 import static com.akolb.HMSBenchmarks.benchmarkListTables;
+import static com.akolb.HMSBenchmarks.benchmarkRenameTable;
 import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
 import static com.akolb.HMSTool.OPT_CONF;
 import static com.akolb.HMSTool.OPT_DATABASE;
@@ -207,6 +208,10 @@ final class HMSBenchmark {
               () -> benchmarkCreatePartitions(bench, client, db, tbl, instances))
           .add("dropPartitions" + '.' + instances,
               () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
+          .add("renameTable",
+              () -> benchmarkRenameTable(bench, client, db, tbl, tbl + "_renamed", instances))
+          .add("dropDatabase" + '.' + instances,
+              () -> benchmarkDropDatabase(bench, client, db, instances))
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
@@ -262,8 +267,8 @@ final class HMSBenchmark {
   }
 
   private static void help(Options options) {
-    HelpFormatter formater = new HelpFormatter();
-    formater.printHelp("hbench ...", options);
+    HelpFormatter formatter = new HelpFormatter();
+    formatter.printHelp("hbench ...", options);
     System.exit(0);
   }
 

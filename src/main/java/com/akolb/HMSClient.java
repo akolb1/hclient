@@ -196,7 +196,7 @@ final class HMSClient implements AutoCloseable {
   }
 
   /**
-   * Create database with th egiven name if it doesn't exist
+   * Create database with the given name if it doesn't exist
    *
    * @param name database name
    */
@@ -206,12 +206,42 @@ final class HMSClient implements AutoCloseable {
     client.create_database(db);
   }
 
+  /**
+   * Create database but convert any exception to unchecked {@link RuntimeException}
+   *
+   * @param name database name
+   */
+  void createDatabaseNoException(@NotNull String name) {
+    try {
+      createDatabase(name);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  void dropDatabase(@NotNull String dbName) throws TException {
+    client.drop_database(dbName, true, true);
+  }
+
+  /**
+   * Drop database but convert any exception to unchecked {@link RuntimeException}.
+   *
+   * @param dbName    Database name
+   */
+  void dropDatabaseNoException(@NotNull String dbName) {
+    try {
+      dropDatabase(dbName);
+    } catch (TException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   void createTable(Table table) throws TException {
     client.create_table(table);
   }
 
   /**
-   * Create tabe but convert any exception to unchecked {@link RuntimeException}
+   * Create table but convert any exception to unchecked {@link RuntimeException}
    *
    * @param table table to create
    */
@@ -373,6 +403,16 @@ final class HMSClient implements AutoCloseable {
       throw  new RuntimeException(e);
     }
   }
+
+  void alterTableNoException(@NotNull String dbName, @NotNull String tableName,
+                             @NotNull Table newTable) {
+    try {
+      client.alter_table(dbName, tableName, newTable);
+    } catch (TException e) {
+      throw  new RuntimeException(e);
+    }
+  }
+
 
   private TTransport open(HiveConf conf, @NotNull URI uri) throws
       TException, IOException, LoginException {
