@@ -374,6 +374,16 @@ final class HMSClient implements AutoCloseable {
     }
   }
 
+  void alterTableNoException(@NotNull String dbName, @NotNull String tableName,
+                             @NotNull Table newTable) {
+    try {
+      client.alter_table(dbName, tableName, newTable);
+    } catch (TException e) {
+      throw  new RuntimeException(e);
+    }
+  }
+
+
   private TTransport open(HiveConf conf, @NotNull URI uri) throws
       TException, IOException, LoginException {
     boolean useSasl = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL);
