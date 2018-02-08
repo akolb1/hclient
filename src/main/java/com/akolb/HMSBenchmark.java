@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
+import static com.akolb.HMSBenchmarks.benchmarkDropDatabase;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
@@ -209,6 +210,8 @@ final class HMSBenchmark {
               () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
           .add("renameTable",
               () -> benchmarkRenameTable(bench, client, db, tbl, tbl + "_renamed", instances))
+          .add("dropDatabase" + '.' + instances,
+              () -> benchmarkDropDatabase(bench, client, db, instances))
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
@@ -264,8 +267,8 @@ final class HMSBenchmark {
   }
 
   private static void help(Options options) {
-    HelpFormatter formater = new HelpFormatter();
-    formater.printHelp("hbench ...", options);
+    HelpFormatter formatter = new HelpFormatter();
+    formatter.printHelp("hbench ...", options);
     System.exit(0);
   }
 
