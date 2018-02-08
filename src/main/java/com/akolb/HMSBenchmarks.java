@@ -285,6 +285,37 @@ class HMSBenchmarks {
     }
   }
 
+  static DescriptiveStatistics benchmarkRenameTable(MicroBenchmark bench,
+                                                    final HMSClient client,
+                                                    final String dbName,
+                                                    final String tableName,
+                                                    final String newTableName,
+                                                    int count) {
+    createPartitionedTable(client, dbName, tableName);
+    try {
+      addManyPartitionsNoException(client, dbName, tableName,
+          Collections.singletonList("d"), count);
+      Table oldTable = client.getTable(dbName, tableName);
+      oldTable.getSd().setLocation("");
+      Table newTable = oldTable.deepCopy();
+      newTable.setTableName(newTableName);
+
+      return bench.measure(
+          null,
+          () -> {
+              client.alterTableNoException(oldTable.getDbName(), oldTable.getTableName(), newTable);
+              client.alterTableNoException(newTable.getDbName(), newTable.getTableName(), oldTable);
+            },
+          null
+      );
+    } catch (TException e) {
+      e.printStackTrace();
+      return new DescriptiveStatistics();
+    } finally {
+      client.dropTableNoException(dbName, tableName);
+    }
+  }
+
   private static void createManyTables(HMSClient client, int howMany, String dbName, String format) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
