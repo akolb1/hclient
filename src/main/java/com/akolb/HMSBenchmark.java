@@ -64,6 +64,7 @@ import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
 import static com.akolb.HMSTool.OPT_CONF;
 import static com.akolb.HMSTool.OPT_DATABASE;
 import static com.akolb.HMSTool.OPT_HOST;
+import static com.akolb.HMSTool.OPT_PORT;
 import static com.akolb.HMSTool.OPT_NUMBER;
 import static com.akolb.HMSTool.OPT_PARTITIONS;
 import static com.akolb.HMSTool.OPT_PATTERN;
@@ -95,7 +96,8 @@ final class HMSBenchmark {
   public static void main(String[] args) throws Exception {
     Options options = new Options();
     options.addOption("H", OPT_HOST, true, "HMS Server")
-        .addOption("P", OPT_PARTITIONS, true, "partitions list")
+        .addOption("P", OPT_PORT, true, "HMS Server port")
+        .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
@@ -147,8 +149,12 @@ final class HMSBenchmark {
         Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
 
+    Integer port = null;
+    if (cmd.getOptionValue(OPT_PORT) != null) {
+      port = Integer.parseInt(cmd.getOptionValue(OPT_PORT));
+    }
     try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)),
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), port),
                  cmd.getOptionValue(OPT_CONF))) {
       if (!client.dbExists(dbName)) {
         client.createDatabase(dbName);

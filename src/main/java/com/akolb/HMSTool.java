@@ -53,6 +53,7 @@ final class HMSTool {
   private static final String DBNAME = "default";
 
   static final String OPT_HOST = "host";
+  static final String OPT_PORT = "port";
   static final String OPT_PARTITIONS = "partitions";
   static final String OPT_DATABASE = "database";
   static final String OPT_TABLE = "table";
@@ -76,7 +77,8 @@ final class HMSTool {
   public static void main(String[] args) throws Exception {
     Options options = new Options();
     options.addOption("H", OPT_HOST, true, "HMS Server")
-        .addOption("P", OPT_PARTITIONS, true, "partitions list")
+        .addOption("P", OPT_PORT, true, "HMS Server port")
+        .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
@@ -120,8 +122,12 @@ final class HMSTool {
 
     LogUtils.initHiveLog4j();
 
+    Integer port = null;
+    if (cmd.getOptionValue(OPT_PORT) != null) {
+      port = Integer.parseInt(cmd.getOptionValue(OPT_PORT));
+    }
     try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)),
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), port),
                  cmd.getOptionValue(OPT_CONF))) {
       switch (command) {
         case CMD_LIST:
