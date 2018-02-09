@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.akolb;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
@@ -37,8 +38,6 @@ import java.util.stream.IntStream;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.addManyPartitionsNoException;
 import static com.akolb.Util.createSchema;
-import static com.akolb.Util.makePartition;
-import static com.akolb.Util.makeTable;
 
 /**
  * Actual benchmark code.
@@ -61,7 +60,7 @@ final class HMSBenchmarks {
                                                     final HMSClient client,
                                                     final String dbName,
                                                     final String tableName) {
-    Table table = makeTable(dbName, tableName, TableType.MANAGED_TABLE,null, null);
+    Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(null,
         () -> client.createTableNoException(table),
@@ -72,7 +71,7 @@ final class HMSBenchmarks {
                                                      final HMSClient client,
                                                      final String dbName,
                                                      final String tableName) {
-    Table table = makeTable(dbName, tableName, TableType.MANAGED_TABLE, null, null);
+    Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(
         () -> client.createTableNoException(table),
@@ -127,7 +126,10 @@ final class HMSBenchmarks {
     final List<String> values = Collections.singletonList("d1");
     try {
       Table t = client.getTable(dbName, tableName);
-      Partition partition = makePartition(t, values);
+      Partition partition = new Util.PartitionBuilder(t)
+          .setValues(values)
+          .build();
+
       return bench.measure(null,
           () -> client.createPartitionNoException(partition),
           () -> client.dropPartitionNoException(dbName, tableName, values));
@@ -203,7 +205,10 @@ final class HMSBenchmarks {
     final List<String> values = Collections.singletonList("d1");
     try {
       Table t = client.getTable(dbName, tableName);
-      Partition partition = makePartition(t, values);
+      Partition partition = new Util.PartitionBuilder(t)
+          .setValues(values)
+          .build();
+
       return bench.measure(
           () -> client.createPartitionNoException(partition),
           () -> client.dropPartitionNoException(dbName, tableName, values),
@@ -303,10 +308,10 @@ final class HMSBenchmarks {
 
       return bench.measure(
           () -> {
-              // Measuring 2 renames, so the tests are idempotent
-              client.alterTableNoException(oldTable.getDbName(), oldTable.getTableName(), newTable);
-              client.alterTableNoException(newTable.getDbName(), newTable.getTableName(), oldTable);
-            }
+            // Measuring 2 renames, so the tests are idempotent
+            client.alterTableNoException(oldTable.getDbName(), oldTable.getTableName(), newTable);
+            client.alterTableNoException(newTable.getDbName(), newTable.getTableName(), oldTable);
+          }
       );
     } catch (TException e) {
       e.printStackTrace();
@@ -315,7 +320,7 @@ final class HMSBenchmarks {
       client.dropTableNoException(dbName, tableName);
     }
   }
-  
+
   static DescriptiveStatistics benchmarkDropDatabase(MicroBenchmark bench,
                                                      final HMSClient client,
                                                      final String dbName,
@@ -340,8 +345,12 @@ final class HMSBenchmarks {
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
     IntStream.range(0, howMany)
         .forEach(i ->
-            client.createTableNoException(makeTable(dbName,
-                String.format(format, i), TableType.MANAGED_TABLE, columns, partitions)));
+            client.createTableNoException(
+                new Util.TableBuilder(dbName, String.format(format, i))
+                    .setTableType(TableType.MANAGED_TABLE)
+                    .setColumns(columns)
+                    .setPartitionKeys(partitions)
+                    .build()));
   }
 
   private static void dropManyTables(HMSClient client, int howMany, String dbName, String format) {
@@ -352,9 +361,12 @@ final class HMSBenchmarks {
 
   // Create a simple table with a single column and single partition
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
-    client.createTableNoException(makeTable(dbName, tableName, TableType.MANAGED_TABLE,
-        createSchema(Collections.singletonList("name:string")),
-        createSchema(Collections.singletonList("date"))));
+    client.createTableNoException(
+        new Util.TableBuilder(dbName, tableName)
+            .setTableType(TableType.MANAGED_TABLE)
+            .setColumns(createSchema(Collections.singletonList("name:string")))
+            .setPartitionKeys(createSchema(Collections.singletonList("date")))
+            .build());
   }
 
   static DescriptiveStatistics benchmarkGetNotificationId(MicroBenchmark benchmark,

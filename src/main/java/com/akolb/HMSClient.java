@@ -59,8 +59,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.akolb.Util.makePartition;
-
 final class HMSClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
   private static final String METASTORE_URI = "hive.metastore.uris";
@@ -284,7 +282,7 @@ final class HMSClient implements AutoCloseable {
   }
 
   void createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
-    client.add_partition(makePartition(table, values));
+    client.add_partition(new Util.PartitionBuilder(table).setValues(values).build());
   }
 
   void createPartitions(List<Partition> partitions) throws TException {

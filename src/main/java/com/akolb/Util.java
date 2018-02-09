@@ -41,11 +41,140 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
-class Util {
+final class Util {
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
   private static final String THRIFT_SCHEMA = "thrift";
   private static final int DEFAULT_PORT = 9083;
+
+  static class TableBuilder {
+    private final String dbName;
+    private final String tableName;
+    private TableType tableType = MANAGED_TABLE;
+    private String serde = LazySimpleSerDe.class.getName();
+    private List<FieldSchema> columns;
+    private List<FieldSchema> partitionKeys;
+    private String inputFormat = HiveInputFormat.class.getName();
+    private String outputFormat = HiveOutputFormat.class.getName();
+
+    private TableBuilder() {
+      dbName = null;
+      tableName = null;
+    }
+
+    TableBuilder(String dbName, String tableName) {
+      this.dbName = dbName;
+      this.tableName = tableName;
+    }
+
+    static Table buildDefaultTable(String dbName, String tableName) {
+      return new TableBuilder(dbName, tableName).build();
+    }
+
+    TableBuilder setTableType(TableType tabeType) {
+      this.tableType = tabeType;
+      return this;
+    }
+
+    TableBuilder setColumns(List<FieldSchema> columns) {
+      this.columns = columns;
+      return this;
+    }
+
+    TableBuilder setPartitionKeys(List<FieldSchema> partitionKeys) {
+      this.partitionKeys = partitionKeys;
+      return this;
+    }
+
+    TableBuilder setSerde(String serde) {
+      this.serde = serde;
+      return this;
+    }
+
+    TableBuilder setInputFormat(String inputFormat) {
+      this.inputFormat = inputFormat;
+      return this;
+    }
+
+    TableBuilder setOutputFormat(String outputFormat) {
+      this.outputFormat = outputFormat;
+      return this;
+    }
+
+    Table build() {
+      StorageDescriptor sd = new StorageDescriptor();
+      if (columns == null) {
+        sd.setCols(Collections.emptyList());
+      } else {
+        sd.setCols(columns);
+      }
+      SerDeInfo serdeInfo = new SerDeInfo();
+      serdeInfo.setSerializationLib(serde);
+      serdeInfo.setName(tableName);
+      sd.setSerdeInfo(serdeInfo);
+      sd.setInputFormat(inputFormat);
+      sd.setOutputFormat(outputFormat);
+
+      Table table = new Table();
+      table.setDbName(dbName);
+      table.setTableName(tableName);
+      table.setSd(sd);
+      if (partitionKeys != null) {
+        table.setPartitionKeys(partitionKeys);
+      }
+      table.setTableType(tableType.toString());
+      return table;
+    }
+  }
+
+  static class PartitionBuilder {
+    private final Table table;
+    private List<String> values;
+    private String location;
+
+    private PartitionBuilder() {
+      table = null;
+    }
+
+    PartitionBuilder(Table table) {
+      this.table = table;
+    }
+
+    PartitionBuilder setValues(List<String> values) {
+      this.values = values;
+      return this;
+    }
+
+    PartitionBuilder setLocation(String location) {
+      this.location = location;
+      return this;
+    }
+
+    Partition build() {
+      Partition partition = new Partition();
+      List<String> partitionNames = table.getPartitionKeys()
+          .stream()
+          .map(FieldSchema::getName)
+          .collect(Collectors.toList());
+      if (partitionNames.size() != values.size()) {
+        throw new RuntimeException("Partition values do not match table schema");
+      }
+      List<String> spec = IntStream.range(0, values.size())
+          .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
+          .collect(Collectors.toList());
+
+      partition.setDbName(table.getDbName());
+      partition.setTableName(table.getTableName());
+      partition.setValues(values);
+      partition.setSd(table.getSd().deepCopy());
+      if (this.location == null) {
+        partition.getSd().setLocation(table.getSd().getLocation() + "/" + Joiner.on("/").join(spec));
+      } else {
+        partition.getSd().setLocation(location);
+      }
+      return partition;
+    }
+  }
 
   /**
    * Create table schema from parameters.
@@ -82,65 +211,6 @@ class Util {
         null, null, null);
   }
 
-  /**
-   * Create Table objects.
-   *
-   * @param dbName    database name
-   * @param tableName table name
-   * @param columns   table schema
-   * @return Table object
-   */
-  static @NotNull
-  Table makeTable(@NotNull String dbName, @NotNull String tableName,
-                  TableType tableType,
-                  @Nullable List<FieldSchema> columns,
-                  @Nullable List<FieldSchema> partitionKeys) {
-    StorageDescriptor sd = new StorageDescriptor();
-    if (columns == null) {
-      sd.setCols(Collections.emptyList());
-    } else {
-      sd.setCols(columns);
-    }
-    SerDeInfo serdeInfo = new SerDeInfo();
-    serdeInfo.setSerializationLib(LazySimpleSerDe.class.getName());
-    serdeInfo.setName(tableName);
-    sd.setSerdeInfo(serdeInfo);
-    sd.setInputFormat(HiveInputFormat.class.getName());
-    sd.setOutputFormat(HiveOutputFormat.class.getName());
-
-    Table table = new Table();
-    table.setDbName(dbName);
-    table.setTableName(tableName);
-    table.setSd(sd);
-    if (partitionKeys != null) {
-      table.setPartitionKeys(partitionKeys);
-    }
-    table.setTableType(tableType.toString());
-    return table;
-  }
-
-
-  static @NotNull
-  Partition makePartition(@NotNull Table table, @NotNull List<String> values) {
-    Partition partition = new Partition();
-    List<String> partitionNames = table.getPartitionKeys()
-        .stream()
-        .map(FieldSchema::getName)
-        .collect(Collectors.toList());
-    if (partitionNames.size() != values.size()) {
-      throw new RuntimeException("Partition values do not match table schema");
-    }
-    List<String> spec = IntStream.range(0, values.size())
-        .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
-        .collect(Collectors.toList());
-
-    partition.setDbName(table.getDbName());
-    partition.setTableName(table.getTableName());
-    partition.setValues(values);
-    partition.setSd(table.getSd().deepCopy());
-    partition.getSd().setLocation(table.getSd().getLocation() + "/" + Joiner.on("/").join(spec));
-    return partition;
-  }
 
   private static FieldSchema param2Schema(@NotNull String param) {
     String colType = DEFAULT_TYPE;
@@ -162,10 +232,11 @@ class Util {
     client.createPartitions(
         IntStream.range(0, npartitions)
             .mapToObj(i ->
-                makePartition(table,
-                    arguments.stream()
-                        .map(a -> a + i)
-                        .collect(Collectors.toList())))
+                new PartitionBuilder(table)
+                    .setValues(
+                        arguments.stream()
+                            .map(a -> a + i)
+                            .collect(Collectors.toList())).build())
             .collect(Collectors.toList()));
   }
 

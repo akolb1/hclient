@@ -32,7 +32,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.common.LogUtils;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -41,7 +40,6 @@ import org.slf4j.LoggerFactory;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
-import static com.akolb.Util.makeTable;
 
 // TODO Handle HADOOP_CONF_DIR and HADOOP_HOME
 
@@ -177,9 +175,10 @@ final class HMSTool {
               }
             }
 
-            client.createTable(makeTable(dbName, tableName, TableType.MANAGED_TABLE,
-                createSchema(arguments),
-                createSchema(partitionInfo)));
+            client.createTable(new Util.TableBuilder(dbName, tableName)
+                .setColumns(createSchema(arguments))
+                .setPartitionKeys(createSchema(partitionInfo))
+                .build());
             LOG.info("Created table '" + tableName + "'");
           } else {
             Set<String> tables = client.getAllTables(dbName, null);
@@ -196,9 +195,10 @@ final class HMSTool {
                 }
               }
 
-              client.createTable(makeTable(dbName, tbl, TableType.MANAGED_TABLE,
-                  createSchema(arguments),
-                  createSchema(partitionInfo)));
+              client.createTable(new Util.TableBuilder(dbName, tableName)
+                  .setColumns(createSchema(arguments))
+                  .setPartitionKeys(createSchema(partitionInfo))
+                  .build());
               tables.add(tbl);
             }
           }

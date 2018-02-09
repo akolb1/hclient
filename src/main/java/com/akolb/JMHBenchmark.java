@@ -15,9 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.akolb;
 
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
@@ -44,7 +44,6 @@ import java.util.List;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
-import static com.akolb.Util.makeTable;
 
 @State(Scope.Thread)
 public class JMHBenchmark {
@@ -128,12 +127,13 @@ public class JMHBenchmark {
     String server = System.getProperty(PROP_HOST);
     LOG.info("Using server " + server + " table '" + dbName + "." + tableName + "'");
     client = new HMSClient(getServerUri(server, Integer.getInteger(PROP_PORT)));
-    table = makeTable(dbName, tableName, TableType.MANAGED_TABLE, null, null);
+    table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
     LOG.info("Create partitioned table {}.{}", dbName, TEST_TABLE);
-    client.createTable(makeTable(dbName, TEST_TABLE, TableType.MANAGED_TABLE,
-        createSchema(Collections.singletonList("name:string")),
-        createSchema(Collections.singletonList("date"))));
-
+    client.createTable(
+        new Util.TableBuilder(dbName, TEST_TABLE)
+            .setColumns(createSchema(Collections.singletonList("name:string")))
+            .setPartitionKeys(createSchema(Collections.singletonList("date")))
+            .build());
   }
 
   @TearDown
