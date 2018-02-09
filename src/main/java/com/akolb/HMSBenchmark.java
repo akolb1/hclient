@@ -37,7 +37,6 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Formatter;
@@ -61,6 +60,7 @@ import static com.akolb.HMSBenchmarks.benchmarkListDatabases;
 import static com.akolb.HMSBenchmarks.benchmarkListManyPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkListPartition;
 import static com.akolb.HMSBenchmarks.benchmarkListTables;
+import static com.akolb.HMSBenchmarks.benchmarkRenameTable;
 import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
 import static com.akolb.HMSTool.OPT_CONF;
 import static com.akolb.HMSTool.OPT_DATABASE;
@@ -214,6 +214,10 @@ final class HMSBenchmark {
               () -> benchmarkCreatePartitions(bench, client, db, tbl, instances))
           .add("dropPartitions" + '.' + instances,
               () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
+          .add("renameTable",
+              () -> benchmarkRenameTable(bench, client, db, tbl, 1))
+          .add("renameTable" + '.' + instances,
+              () -> benchmarkRenameTable(bench, client, db, tbl, instances))
           .add("dropDatabase",
               () -> benchmarkDropDatabase(bench, client, db, 1))
           .add("dropDatabase" + '.' + instances,
