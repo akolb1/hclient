@@ -150,12 +150,8 @@ final class HMSBenchmark {
         Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
 
-    Integer port = null;
-    if (cmd.getOptionValue(OPT_PORT) != null) {
-      port = Integer.parseInt(cmd.getOptionValue(OPT_PORT));
-    }
     try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), port),
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
                  cmd.getOptionValue(OPT_CONF))) {
       if (!client.dbExists(dbName)) {
         client.createDatabase(dbName);

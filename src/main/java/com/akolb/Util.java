@@ -19,6 +19,7 @@
 package com.akolb;
 
 import com.google.common.base.Joiner;
+import com.google.common.net.HostAndPort;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -31,6 +32,8 @@ import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
 import org.apache.thrift.TException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -45,7 +48,14 @@ final class Util {
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
   private static final String THRIFT_SCHEMA = "thrift";
+  static final String DEFAULT_HOST = "localhost";
   private static final int DEFAULT_PORT = 9083;
+  private static final String ENV_SERVER = "HMS_HOST";
+  private static final String ENV_PORT = "HMS_PORT";
+  private static final String PROP_HOST = "hms.host";
+  private static final String PROP_PORT = "hms.port";
+
+  private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
   static class TableBuilder {
     private final String dbName;
@@ -193,21 +203,58 @@ final class Util {
         .collect(Collectors.toList());
   }
 
-  static @Nullable URI getServerUri(@Nullable String host) throws URISyntaxException {
-    return getServerUri(host, DEFAULT_PORT);
-  }
-
-  static @Nullable URI getServerUri(@Nullable String host, @Nullable Integer port) throws
+  /**
+   * Get server URI.<p>
+   *
+   * HMS host is obtained from
+   * <ol>
+   *   <li>Argument</li>
+   *   <li>HMS_HOST environment parameter</li>
+   *   <li>hms.host Java property</li>
+   *   <li>use 'localhost' if above fails</li>
+   * </ol>
+   * HMS Port is obtained from
+   * <ol>
+   *   <li>Argument</li>
+   *   <li>host:port string</li>
+   *   <li>HMS_PORT environment variable</li>
+   *   <li>hms.port Java property</li>
+   *   <li>default port value</li>
+   * </ol>
+   *
+   * @param host HMS host string.
+   * @param portString HMS port
+   * @return HMS URI
+   * @throws URISyntaxException
+   */
+  static @Nullable URI getServerUri(@Nullable String host, @Nullable String portString) throws
       URISyntaxException {
     if (host == null) {
-      return null;
+      host = System.getenv(ENV_SERVER);
+    }
+    if (host == null) {
+      host = System.getProperty(PROP_HOST);
+    }
+    if (host == null) {
+      host = DEFAULT_HOST;
+    }
+    if (portString == null && !host.contains(":")) {
+      portString = System.getenv(ENV_PORT);
+      if (portString == null) {
+        portString = System.getProperty(PROP_PORT);
+      }
+    }
+    Integer port = DEFAULT_PORT;
+    if (portString != null) {
+      port = Integer.parseInt(portString);
     }
 
-    if (port == null) {
-      port = DEFAULT_PORT;
-    }
+    HostAndPort hp = HostAndPort.fromString(host)
+        .withDefaultPort(port);
 
-    return new URI(THRIFT_SCHEMA, null, host, port,
+    LOG.info("Connecting to {}:{}", hp.getHostText(), hp.getPort());
+
+    return new URI(THRIFT_SCHEMA, null, hp.getHostText(), hp.getPort(),
         null, null, null);
   }
 

@@ -64,7 +64,6 @@ final class HMSTool {
   private static final String OPT_SHOW_PARTS = "showparts";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
-  static final String ENV_SERVER = "HMS_THRIFT_SERVER";
 
   private static final String CMD_LIST = "list";
   private static final String CMD_CREATE = "create";
@@ -121,12 +120,8 @@ final class HMSTool {
 
     LogUtils.initHiveLog4j();
 
-    Integer port = null;
-    if (cmd.getOptionValue(OPT_PORT) != null) {
-      port = Integer.parseInt(cmd.getOptionValue(OPT_PORT));
-    }
     try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), port),
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
                  cmd.getOptionValue(OPT_CONF))) {
       switch (command) {
         case CMD_LIST:
