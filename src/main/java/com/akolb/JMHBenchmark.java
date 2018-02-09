@@ -52,6 +52,7 @@ public class JMHBenchmark {
   private static final String TEST_TABLE = "bench_table1";
   private static final int NOBJECTS = 1000;
   private static final String PROP_HOST = "hms.host";
+  private static final String PROP_PORT = "hms.port";
   private static final String PROP_DATABASE = "db.name";
   private static final String PROP_TABLE = "table.name";
 
@@ -67,15 +68,16 @@ public class JMHBenchmark {
 
     HMSClient client = null;
     String host = System.getProperty(PROP_HOST);
+    Integer port = Integer.getInteger(PROP_PORT);
     if (host == null) {
       LOG.error("Missing hostname");
       System.exit(1);
     }
 
 
-    LOG.info("host = {}", host);
+    LOG.info("host = {}, port = {}", host, port);
     try {
-      client = new HMSClient(getServerUri(host));
+      client = new HMSClient(getServerUri(host, port));
     } catch (IOException e) {
       LOG.error("Failed to connect to HMS", e);
       System.exit(1);
@@ -124,7 +126,7 @@ public class JMHBenchmark {
     dbName = System.getProperty(PROP_DATABASE);
     String server = System.getProperty(PROP_HOST);
     LOG.info("Using server " + server + " table '" + dbName + "." + tableName + "'");
-    client = new HMSClient(getServerUri(server));
+    client = new HMSClient(getServerUri(server, Integer.getInteger(PROP_PORT)));
     table = makeTable(dbName, tableName, null, null);
     LOG.info("Create partitioned table {}.{}", dbName, TEST_TABLE);
     client.createTable(makeTable(dbName, TEST_TABLE,

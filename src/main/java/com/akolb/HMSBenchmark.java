@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
+import static com.akolb.HMSBenchmarks.benchmarkDropDatabase;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkGetNotificationId;
@@ -64,6 +65,7 @@ import static com.akolb.HMSBenchmarks.benchmarkTableCreate;
 import static com.akolb.HMSTool.OPT_CONF;
 import static com.akolb.HMSTool.OPT_DATABASE;
 import static com.akolb.HMSTool.OPT_HOST;
+import static com.akolb.HMSTool.OPT_PORT;
 import static com.akolb.HMSTool.OPT_NUMBER;
 import static com.akolb.HMSTool.OPT_PARTITIONS;
 import static com.akolb.HMSTool.OPT_PATTERN;
@@ -95,7 +97,8 @@ final class HMSBenchmark {
   public static void main(String[] args) throws Exception {
     Options options = new Options();
     options.addOption("H", OPT_HOST, true, "HMS Server")
-        .addOption("P", OPT_PARTITIONS, true, "partitions list")
+        .addOption("P", OPT_PORT, true, "HMS Server port")
+        .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
@@ -147,8 +150,12 @@ final class HMSBenchmark {
         Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
 
+    Integer port = null;
+    if (cmd.getOptionValue(OPT_PORT) != null) {
+      port = Integer.parseInt(cmd.getOptionValue(OPT_PORT));
+    }
     try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST)),
+             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), port),
                  cmd.getOptionValue(OPT_CONF))) {
       if (!client.dbExists(dbName)) {
         client.createDatabase(dbName);
@@ -211,6 +218,10 @@ final class HMSBenchmark {
               () -> benchmarkRenameTable(bench, client, db, tbl, 1))
           .add("renameTable" + '.' + instances,
               () -> benchmarkRenameTable(bench, client, db, tbl, instances))
+          .add("dropDatabase",
+              () -> benchmarkDropDatabase(bench, client, db, 1))
+          .add("dropDatabase" + '.' + instances,
+              () -> benchmarkDropDatabase(bench, client, db, instances))
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
@@ -266,8 +277,8 @@ final class HMSBenchmark {
   }
 
   private static void help(Options options) {
-    HelpFormatter formater = new HelpFormatter();
-    formater.printHelp("hbench ...", options);
+    HelpFormatter formatter = new HelpFormatter();
+    formatter.printHelp("hbench ...", options);
     System.exit(0);
   }
 

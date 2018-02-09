@@ -63,11 +63,20 @@ class Util {
   }
 
   static @Nullable URI getServerUri(@Nullable String host) throws URISyntaxException {
+    return getServerUri(host, DEFAULT_PORT);
+  }
+
+  static @Nullable URI getServerUri(@Nullable String host, @Nullable Integer port) throws
+      URISyntaxException {
     if (host == null) {
       return null;
     }
 
-    return new URI(THRIFT_SCHEMA, null, host, DEFAULT_PORT,
+    if (port == null) {
+      port = DEFAULT_PORT;
+    }
+
+    return new URI(THRIFT_SCHEMA, null, host, port,
         null, null, null);
   }
 
