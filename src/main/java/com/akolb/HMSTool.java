@@ -32,6 +32,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.common.LogUtils;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -176,7 +177,7 @@ final class HMSTool {
               }
             }
 
-            client.createTable(makeTable(dbName, tableName,
+            client.createTable(makeTable(dbName, tableName, TableType.MANAGED_TABLE,
                 createSchema(arguments),
                 createSchema(partitionInfo)));
             LOG.info("Created table '" + tableName + "'");
@@ -195,7 +196,7 @@ final class HMSTool {
                 }
               }
 
-              client.createTable(makeTable(dbName, tbl,
+              client.createTable(makeTable(dbName, tbl, TableType.MANAGED_TABLE,
                   createSchema(arguments),
                   createSchema(partitionInfo)));
               tables.add(tbl);

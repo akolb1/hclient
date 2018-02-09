@@ -19,6 +19,7 @@
 package com.akolb;
 
 import com.google.common.base.Joiner;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -31,13 +32,14 @@ import org.apache.thrift.TException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
 class Util {
   private static final String DEFAULT_TYPE = "string";
@@ -46,7 +48,7 @@ class Util {
   private static final int DEFAULT_PORT = 9083;
 
   /**
-   * Create table schema from parameters
+   * Create table schema from parameters.
    *
    * @param params list of parameters. Each parameter can be either a simple name or
    *               name:type for non-String types.
@@ -81,7 +83,7 @@ class Util {
   }
 
   /**
-   * Create Table objects
+   * Create Table objects.
    *
    * @param dbName    database name
    * @param tableName table name
@@ -90,6 +92,7 @@ class Util {
    */
   static @NotNull
   Table makeTable(@NotNull String dbName, @NotNull String tableName,
+                  TableType tableType,
                   @Nullable List<FieldSchema> columns,
                   @Nullable List<FieldSchema> partitionKeys) {
     StorageDescriptor sd = new StorageDescriptor();
@@ -112,7 +115,7 @@ class Util {
     if (partitionKeys != null) {
       table.setPartitionKeys(partitionKeys);
     }
-
+    table.setTableType(tableType.toString());
     return table;
   }
 
@@ -139,7 +142,7 @@ class Util {
     return partition;
   }
 
-  private static FieldSchema param2Schema(@Nonnull String param) {
+  private static FieldSchema param2Schema(@NotNull String param) {
     String colType = DEFAULT_TYPE;
     String name = param;
     if (param.contains(TYPE_SEPARATOR)) {

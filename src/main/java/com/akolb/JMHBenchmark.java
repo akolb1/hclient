@@ -17,6 +17,7 @@
  */
 package com.akolb;
 
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
@@ -127,9 +128,9 @@ public class JMHBenchmark {
     String server = System.getProperty(PROP_HOST);
     LOG.info("Using server " + server + " table '" + dbName + "." + tableName + "'");
     client = new HMSClient(getServerUri(server, Integer.getInteger(PROP_PORT)));
-    table = makeTable(dbName, tableName, null, null);
+    table = makeTable(dbName, tableName, TableType.MANAGED_TABLE, null, null);
     LOG.info("Create partitioned table {}.{}", dbName, TEST_TABLE);
-    client.createTable(makeTable(dbName, TEST_TABLE,
+    client.createTable(makeTable(dbName, TEST_TABLE, TableType.MANAGED_TABLE,
         createSchema(Collections.singletonList("name:string")),
         createSchema(Collections.singletonList("date"))));
 

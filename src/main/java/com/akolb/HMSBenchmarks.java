@@ -18,6 +18,7 @@
 package com.akolb;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -42,7 +43,7 @@ import static com.akolb.Util.makeTable;
 /**
  * Actual benchmark code.
  */
-class HMSBenchmarks {
+final class HMSBenchmarks {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmarks.class);
 
   static DescriptiveStatistics benchmarkListDatabases(MicroBenchmark benchmark,
@@ -60,7 +61,7 @@ class HMSBenchmarks {
                                                     final HMSClient client,
                                                     final String dbName,
                                                     final String tableName) {
-    Table table = makeTable(dbName, tableName, null, null);
+    Table table = makeTable(dbName, tableName, TableType.MANAGED_TABLE,null, null);
 
     return bench.measure(null,
         () -> client.createTableNoException(table),
@@ -71,7 +72,7 @@ class HMSBenchmarks {
                                                      final HMSClient client,
                                                      final String dbName,
                                                      final String tableName) {
-    Table table = makeTable(dbName, tableName, null, null);
+    Table table = makeTable(dbName, tableName, TableType.MANAGED_TABLE, null, null);
 
     return bench.measure(
         () -> client.createTableNoException(table),
@@ -85,6 +86,7 @@ class HMSBenchmarks {
         () -> {
           //noinspection EmptyTryBlock
           try (Socket socket = new Socket(server, port)) {
+            ;
           } catch (IOException e) {
             LOG.error("socket connection failed", e);
           }
@@ -339,7 +341,7 @@ class HMSBenchmarks {
     IntStream.range(0, howMany)
         .forEach(i ->
             client.createTableNoException(makeTable(dbName,
-                String.format(format, i), columns, partitions)));
+                String.format(format, i), TableType.MANAGED_TABLE, columns, partitions)));
   }
 
   private static void dropManyTables(HMSClient client, int howMany, String dbName, String format) {
@@ -350,7 +352,7 @@ class HMSBenchmarks {
 
   // Create a simple table with a single column and single partition
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
-    client.createTableNoException(makeTable(dbName, tableName,
+    client.createTableNoException(makeTable(dbName, tableName, TableType.MANAGED_TABLE,
         createSchema(Collections.singletonList("name:string")),
         createSchema(Collections.singletonList("date"))));
   }
