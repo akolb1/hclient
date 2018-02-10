@@ -71,6 +71,7 @@ final class HMSTool {
   private static final String CMD_DROP = "drop";
   private static final String CMD_LIST_NID = "currnid";
   private static final String CMD_RENAME = "rename";
+  private static final String CMD_DROPDB = "dropdb";
 
 
   public static void main(String[] args) throws Exception {
@@ -133,6 +134,9 @@ final class HMSTool {
           break;
         case CMD_LIST_NID:
           System.out.println(client.getCurrentNotificationId());
+          break;
+        case CMD_DROPDB:
+          cmdDropDatabase(client, cmd);
           break;
         default:
           LOG.warn("Unknown command '" + command + "'");
@@ -354,6 +358,15 @@ final class HMSTool {
           .sorted()
           .forEach(tblName -> client.dropTableNoException(dbName, tblName));
     }
+  }
+
+  private static void cmdDropDatabase(HMSClient client, CommandLine cmd) throws TException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    if (dbName == null) {
+      LOG.warn("Missing database");
+      System.exit(1);
+    }
+    client.dropDatabase(dbName);
   }
 
   private static void addPartition(HMSClient client, String dbName, String tableName,
