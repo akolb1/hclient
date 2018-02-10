@@ -70,6 +70,7 @@ final class HMSTool {
   private static final String CMD_ADD_PART = "addpart";
   private static final String CMD_DROP = "drop";
   private static final String CMD_LIST_NID = "currnid";
+  private static final String CMD_RENAME = "rename";
 
 
   public static void main(String[] args) throws Exception {
@@ -109,15 +110,6 @@ final class HMSTool {
       arguments = arguments.subList(1, arguments.size());
     }
 
-    String dbName = cmd.getOptionValue(OPT_DATABASE);
-    String tableName = cmd.getOptionValue(OPT_TABLE);
-
-    String partitionsInfo = cmd.getOptionValue(OPT_PARTITIONS);
-    String[] partitions = partitionsInfo == null ? null : partitionsInfo.split(",");
-    List<String> partitionInfo = partitions == null ?
-        Collections.emptyList() :
-        new ArrayList<>(Arrays.asList(partitions));
-
     LogUtils.initHiveLog4j();
 
     try (HMSClient client =
@@ -127,108 +119,21 @@ final class HMSTool {
         case CMD_LIST:
           cmdDisplayTables(client, cmd);
           break;
-
         case CMD_CREATE:
-          if (tableName != null && tableName.contains(".")) {
-            String[] parts = tableName.split("\\.");
-            dbName = parts[0];
-            tableName = parts[1];
-          }
-
-          boolean multiple = false;
-          int nTables = 0;
-          if (cmd.hasOption(OPT_NUMBER)) {
-            nTables = Integer.valueOf(cmd.getOptionValue(OPT_NUMBER, "0"));
-            if (nTables > 0) {
-              multiple = true;
-            }
-          }
-
-          if (dbName == null) {
-            dbName = DBNAME;
-          }
-
-          if (tableName == null) {
-            LOG.warn("Missing table name");
-            System.exit(1);
-          }
-
-          if (!client.dbExists(dbName)) {
-            client.createDatabase(dbName);
-          } else {
-            LOG.warn("Database '" + dbName + "' already exist");
-          }
-
-          if (!multiple) {
-            if (client.tableExists(dbName, tableName)) {
-              if (cmd.hasOption(OPT_DROP)) {
-                LOG.warn("Dropping existing table '" + tableName + "'");
-                client.dropTable(dbName, tableName);
-              } else {
-                LOG.warn("Table '" + tableName + "' already exist");
-                break;
-              }
-            }
-
-            client.createTable(new Util.TableBuilder(dbName, tableName)
-                .setColumns(createSchema(arguments))
-                .setPartitionKeys(createSchema(partitionInfo))
-                .build());
-            LOG.info("Created table '" + tableName + "'");
-          } else {
-            Set<String> tables = client.getAllTables(dbName, null);
-            for (int i = 1; i <= nTables; i++) {
-              String pattern = cmd.getOptionValue(OPT_PATTERN, DEFAULT_PATTERN);
-              String tbl = String.format(pattern, tableName, i);
-              if (tables.contains(tbl)) {
-                if (cmd.hasOption(OPT_DROP)) {
-                  LOG.warn("Dropping existing table '" + tbl + "'");
-                  client.dropTable(dbName, tbl);
-                } else {
-                  LOG.warn("Table '" + tbl + "' already exist");
-                  break;
-                }
-              }
-
-              client.createTable(new Util.TableBuilder(dbName, tableName)
-                  .setColumns(createSchema(arguments))
-                  .setPartitionKeys(createSchema(partitionInfo))
-                  .build());
-              tables.add(tbl);
-            }
-          }
+          cmdCreate(client, cmd, arguments);
           break;
         case CMD_ADD_PART:
-          if (tableName != null && tableName.contains(".")) {
-            String[] parts = tableName.split("\\.");
-            dbName = parts[0];
-            tableName = parts[1];
-          }
-          if (cmd.hasOption(OPT_NUMBER)) {
-            int nPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
-            addManyPartitions(client, dbName, tableName, arguments, nPartitions);
-          } else {
-            addPartition(client, dbName, tableName, arguments);
-          }
+          cmdAddPart(client, cmd, arguments);
           break;
-
         case CMD_DROP:
-          if (dbName == null || dbName.isEmpty()) {
-            System.out.println("Missing database name");
-            System.exit(1);
-          }
-          if (!arguments.isEmpty()) {
-            // Drop partition case
-            client.dropPartition(dbName, tableName, arguments);
-          } else {
-            dropTables(client, dbName, tableName);
-          }
+          cmdDrop(client, cmd, arguments);
           break;
-
+        case CMD_RENAME:
+          cmdRename(client, cmd, arguments);
+          break;
         case CMD_LIST_NID:
           System.out.println(client.getCurrentNotificationId());
           break;
-
         default:
           LOG.warn("Unknown command '" + command + "'");
           System.exit(1);
@@ -268,7 +173,180 @@ final class HMSTool {
     }
   }
 
-  private static void dropTables(HMSClient client, String dbName, String tableName)
+  private static void cmdCreate(HMSClient client, CommandLine cmd, List<String> arguments)
+      throws TException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+
+    if (tableName != null && tableName.contains(".")) {
+      String[] parts = tableName.split("\\.");
+      dbName = parts[0];
+      tableName = parts[1];
+    }
+
+    boolean multiple = false;
+    int nTables = 0;
+    if (cmd.hasOption(OPT_NUMBER)) {
+      nTables = Integer.valueOf(cmd.getOptionValue(OPT_NUMBER, "0"));
+      if (nTables > 0) {
+        multiple = true;
+      }
+    }
+
+    if (dbName == null) {
+      dbName = DBNAME;
+    }
+
+    if (tableName == null) {
+      LOG.warn("Missing table name");
+      System.exit(1);
+    }
+
+    if (!client.dbExists(dbName)) {
+      client.createDatabase(dbName);
+    } else {
+      LOG.warn("Database '" + dbName + "' already exist");
+    }
+
+    String partitionsInfo = cmd.getOptionValue(OPT_PARTITIONS);
+    String[] partitions = partitionsInfo == null ? null : partitionsInfo.split(",");
+    List<String> partitionInfo = partitions == null ?
+        Collections.emptyList() :
+        new ArrayList<>(Arrays.asList(partitions));
+
+    if (!multiple) {
+      if (client.tableExists(dbName, tableName)) {
+        if (cmd.hasOption(OPT_DROP)) {
+          LOG.warn("Dropping existing table '" + tableName + "'");
+          client.dropTable(dbName, tableName);
+        } else {
+          LOG.warn("Table '" + tableName + "' already exist");
+          return;
+        }
+      }
+
+      client.createTable(new Util.TableBuilder(dbName, tableName)
+          .setColumns(createSchema(arguments))
+          .setPartitionKeys(createSchema(partitionInfo))
+          .build());
+      LOG.info("Created table '" + tableName + "'");
+    } else {
+      Set<String> tables = client.getAllTables(dbName, null);
+      for (int i = 1; i <= nTables; i++) {
+        String pattern = cmd.getOptionValue(OPT_PATTERN, DEFAULT_PATTERN);
+        String tbl = String.format(pattern, tableName, i);
+        if (tables.contains(tbl)) {
+          if (cmd.hasOption(OPT_DROP)) {
+            LOG.warn("Dropping existing table '" + tbl + "'");
+            client.dropTable(dbName, tbl);
+          } else {
+            LOG.warn("Table '" + tbl + "' already exist");
+            break;
+          }
+        }
+
+        client.createTable(new Util.TableBuilder(dbName, tableName)
+            .setColumns(createSchema(arguments))
+            .setPartitionKeys(createSchema(partitionInfo))
+            .build());
+        tables.add(tbl);
+      }
+    }
+  }
+
+  private static void cmdAddPart(HMSClient client, CommandLine cmd, List<String> arguments)
+      throws TException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+
+    if (tableName != null && tableName.contains(".")) {
+      String[] parts = tableName.split("\\.");
+      dbName = parts[0];
+      tableName = parts[1];
+    }
+
+    if (cmd.hasOption(OPT_NUMBER)) {
+      int nPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
+      addManyPartitions(client, dbName, tableName, arguments, nPartitions);
+    } else {
+      addPartition(client, dbName, tableName, arguments);
+    }
+  }
+
+  private static void cmdDrop(HMSClient client, CommandLine cmd, List<String> arguments)
+      throws TException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+
+    if (tableName != null && tableName.contains(".")) {
+      String[] parts = tableName.split("\\.");
+      dbName = parts[0];
+      tableName = parts[1];
+    }
+    if (dbName == null || dbName.isEmpty()) {
+      System.out.println("Missing database name");
+      System.exit(1);
+    }
+    if (!arguments.isEmpty()) {
+      // Drop partition case
+      if (tableName == null || tableName.isEmpty()) {
+        System.out.println("Missing table name");
+        System.exit(1);
+      }
+      client.dropPartition(dbName, tableName, arguments);
+    } else {
+      dropTables(client, dbName, tableName);
+    }
+  }
+
+  /**
+   * Rename table
+   * @param client
+   * @param cmd
+   * @param arguments
+   * @throws TException
+   */
+  private static void cmdRename(HMSClient client, CommandLine cmd, List<String> arguments)
+      throws TException {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+
+    if (arguments.isEmpty()) {
+      System.out.println("Missing new name for rename");
+      System.exit(1);
+    }
+    if (arguments.size() > 1) {
+      System.out.println("too many arguments for rename");
+      System.exit(1);
+    }
+
+    if (tableName != null && tableName.contains(".")) {
+      String[] parts = tableName.split("\\.");
+      dbName = parts[0];
+      tableName = parts[1];
+    }
+
+    if (tableName == null) {
+      LOG.warn("Missing table name");
+      System.exit(1);
+    }
+    if (dbName == null) {
+      dbName = DBNAME;
+    }
+
+    String newName = arguments.get(0);
+    String oldTblName = dbName + "." + tableName;
+    String newTblName =  dbName + "." + newName;
+    LOG.info("Renaming {} to {}", oldTblName, newTblName);
+    Table oldTable = client.getTable(dbName, tableName);
+    Table newTable = oldTable.deepCopy();
+    newTable.setTableName(newName);
+    oldTable.getSd().setLocation("");
+    client.alterTable(dbName, tableName, newTable);
+  }
+
+
+    private static void dropTables(HMSClient client, String dbName, String tableName)
       throws TException {
     for (String database : client.getAllDatabases(dbName)) {
       client.getAllTables(database, tableName)
