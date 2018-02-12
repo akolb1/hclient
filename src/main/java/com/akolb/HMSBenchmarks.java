@@ -347,9 +347,9 @@ final class HMSBenchmarks {
         .forEach(i ->
             client.createTableNoException(
                 new Util.TableBuilder(dbName, String.format(format, i))
-                    .setTableType(TableType.MANAGED_TABLE)
-                    .setColumns(columns)
-                    .setPartitionKeys(partitions)
+                    .withType(TableType.MANAGED_TABLE)
+                    .withColumns(columns)
+                    .withPartitionKeys(partitions)
                     .build()));
   }
 
@@ -363,9 +363,9 @@ final class HMSBenchmarks {
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
     client.createTableNoException(
         new Util.TableBuilder(dbName, tableName)
-            .setTableType(TableType.MANAGED_TABLE)
-            .setColumns(createSchema(Collections.singletonList("name:string")))
-            .setPartitionKeys(createSchema(Collections.singletonList("date")))
+            .withType(TableType.MANAGED_TABLE)
+            .withColumns(createSchema(Collections.singletonList("name:string")))
+            .withPartitionKeys(createSchema(Collections.singletonList("date")))
             .build());
   }
 

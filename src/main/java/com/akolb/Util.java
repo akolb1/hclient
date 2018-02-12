@@ -38,7 +38,9 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -61,11 +63,13 @@ final class Util {
     private final String dbName;
     private final String tableName;
     private TableType tableType = MANAGED_TABLE;
+    private String location;
     private String serde = LazySimpleSerDe.class.getName();
     private List<FieldSchema> columns;
     private List<FieldSchema> partitionKeys;
     private String inputFormat = HiveInputFormat.class.getName();
     private String outputFormat = HiveOutputFormat.class.getName();
+    private Map<String, String> parameters = new HashMap<>();
 
     private TableBuilder() {
       dbName = null;
@@ -81,33 +85,43 @@ final class Util {
       return new TableBuilder(dbName, tableName).build();
     }
 
-    TableBuilder setTableType(TableType tabeType) {
+    TableBuilder withType(TableType tabeType) {
       this.tableType = tabeType;
       return this;
     }
 
-    TableBuilder setColumns(List<FieldSchema> columns) {
+    TableBuilder withColumns(List<FieldSchema> columns) {
       this.columns = columns;
       return this;
     }
 
-    TableBuilder setPartitionKeys(List<FieldSchema> partitionKeys) {
+    TableBuilder withPartitionKeys(List<FieldSchema> partitionKeys) {
       this.partitionKeys = partitionKeys;
       return this;
     }
 
-    TableBuilder setSerde(String serde) {
+    TableBuilder withSerde(String serde) {
       this.serde = serde;
       return this;
     }
 
-    TableBuilder setInputFormat(String inputFormat) {
+    TableBuilder withInputFormat(String inputFormat) {
       this.inputFormat = inputFormat;
       return this;
     }
 
-    TableBuilder setOutputFormat(String outputFormat) {
+    TableBuilder withOutputFormat(String outputFormat) {
       this.outputFormat = outputFormat;
+      return this;
+    }
+
+    TableBuilder withParameter(String name, String value) {
+      parameters.put(name, value);
+      return this;
+    }
+
+    TableBuilder withLocation(String location) {
+      this.location = location;
       return this;
     }
 
@@ -124,11 +138,15 @@ final class Util {
       sd.setSerdeInfo(serdeInfo);
       sd.setInputFormat(inputFormat);
       sd.setOutputFormat(outputFormat);
+      if (location != null) {
+        sd.setLocation(location);
+      }
 
       Table table = new Table();
       table.setDbName(dbName);
       table.setTableName(tableName);
       table.setSd(sd);
+      table.setParameters(parameters);
       if (partitionKeys != null) {
         table.setPartitionKeys(partitionKeys);
       }
@@ -141,6 +159,7 @@ final class Util {
     private final Table table;
     private List<String> values;
     private String location;
+    private Map<String, String> parameters = new HashMap<>();
 
     private PartitionBuilder() {
       table = null;
@@ -155,8 +174,13 @@ final class Util {
       return this;
     }
 
-    PartitionBuilder setLocation(String location) {
+    PartitionBuilder withLocation(String location) {
       this.location = location;
+      return this;
+    }
+
+    PartitionBuilder withParameter(String name, String value) {
+      parameters.put(name, value);
       return this;
     }
 
@@ -175,6 +199,7 @@ final class Util {
 
       partition.setDbName(table.getDbName());
       partition.setTableName(table.getTableName());
+      partition.setParameters(parameters);
       partition.setValues(values);
       partition.setSd(table.getSd().deepCopy());
       if (this.location == null) {
@@ -205,24 +230,24 @@ final class Util {
 
   /**
    * Get server URI.<p>
-   *
+   * <p>
    * HMS host is obtained from
    * <ol>
-   *   <li>Argument</li>
-   *   <li>HMS_HOST environment parameter</li>
-   *   <li>hms.host Java property</li>
-   *   <li>use 'localhost' if above fails</li>
+   * <li>Argument</li>
+   * <li>HMS_HOST environment parameter</li>
+   * <li>hms.host Java property</li>
+   * <li>use 'localhost' if above fails</li>
    * </ol>
    * HMS Port is obtained from
    * <ol>
-   *   <li>Argument</li>
-   *   <li>host:port string</li>
-   *   <li>HMS_PORT environment variable</li>
-   *   <li>hms.port Java property</li>
-   *   <li>default port value</li>
+   * <li>Argument</li>
+   * <li>host:port string</li>
+   * <li>HMS_PORT environment variable</li>
+   * <li>hms.port Java property</li>
+   * <li>default port value</li>
    * </ol>
    *
-   * @param host HMS host string.
+   * @param host       HMS host string.
    * @param portString HMS port
    * @return HMS URI
    * @throws URISyntaxException

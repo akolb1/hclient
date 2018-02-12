@@ -230,8 +230,8 @@ final class HMSTool {
       }
 
       client.createTable(new Util.TableBuilder(dbName, tableName)
-          .setColumns(createSchema(arguments))
-          .setPartitionKeys(createSchema(partitionInfo))
+          .withColumns(createSchema(arguments))
+          .withPartitionKeys(createSchema(partitionInfo))
           .build());
       LOG.info("Created table '" + tableName + "'");
     } else {
@@ -250,8 +250,8 @@ final class HMSTool {
         }
 
         client.createTable(new Util.TableBuilder(dbName, tableName)
-            .setColumns(createSchema(arguments))
-            .setPartitionKeys(createSchema(partitionInfo))
+            .withColumns(createSchema(arguments))
+            .withPartitionKeys(createSchema(partitionInfo))
             .build());
         tables.add(tbl);
       }

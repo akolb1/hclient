@@ -118,8 +118,8 @@ public class JMHBenchmark {
     LOG.info("Create partitioned table {}.{}", dbName, TEST_TABLE);
     client.createTable(
         new Util.TableBuilder(dbName, TEST_TABLE)
-            .setColumns(createSchema(Collections.singletonList("name:string")))
-            .setPartitionKeys(createSchema(Collections.singletonList("date")))
+            .withColumns(createSchema(Collections.singletonList("name:string")))
+            .withPartitionKeys(createSchema(Collections.singletonList("date")))
             .build());
   }
 
