@@ -65,6 +65,7 @@ final class Util {
     private TableType tableType = MANAGED_TABLE;
     private String location;
     private String serde = LazySimpleSerDe.class.getName();
+    private String owner;
     private List<FieldSchema> columns;
     private List<FieldSchema> partitionKeys;
     private String inputFormat = HiveInputFormat.class.getName();
@@ -87,6 +88,11 @@ final class Util {
 
     TableBuilder withType(TableType tabeType) {
       this.tableType = tabeType;
+      return this;
+    }
+
+    TableBuilder withOwner(String owner) {
+      this.owner = owner;
       return this;
     }
 
@@ -147,6 +153,7 @@ final class Util {
       table.setTableName(tableName);
       table.setSd(sd);
       table.setParameters(parameters);
+      table.setOwner(owner);
       if (partitionKeys != null) {
         table.setPartitionKeys(partitionKeys);
       }
