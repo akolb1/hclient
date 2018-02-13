@@ -55,6 +55,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -150,8 +151,12 @@ final class HMSClient implements AutoCloseable {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
+  Database getDatabase(@NotNull String dbName) throws TException {
+    return client.get_database(dbName);
+  }
+
   /**
-   * Return all databases with name matching the filter
+   * Return all databases with name matching the filter.
    *
    * @param filter Regexp. Can be null or empty in which case everything matches
    * @return list of database names matching the filter
@@ -199,8 +204,23 @@ final class HMSClient implements AutoCloseable {
    * @param name database name
    */
   void createDatabase(@NotNull String name) throws TException {
-    Database db = new Database();
-    db.setName(name);
+    createDatabase(name, null, null, null);
+  }
+
+  /**
+   * Create database if it doesn't exist
+   * @param name Database name
+   * @param description Database description
+   * @param location Database location
+   * @param params Database params
+   * @throws TException if database exists
+   */
+  void createDatabase(@NotNull String name,
+                      @Nullable String description,
+                      @Nullable String location,
+                      @Nullable Map<String, String> params)
+      throws TException {
+    Database db = new Database(name, description, location, params);
     client.create_database(db);
   }
 
