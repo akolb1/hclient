@@ -37,6 +37,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
@@ -163,11 +164,12 @@ final class HMSTool {
           .sorted()
           .forEach(tblName -> {
             if (verbose) {
-              Table table = client.getTableNoException(database, tblName);
+              Table table = throwingSupplierWrapper(() -> client.getTable(database, tblName));
               displayTableSchema(table);
               if (showPartitions) {
                 System.out.println("\t\t" + Joiner.on("\n\t\t")
-                    .join(client.getPartitionNamesNoException(database, tblName)));
+                    .join(throwingSupplierWrapper(() ->
+                        client.getPartitionNames(database, tblName))));
               }
               System.out.println();
             } else {
@@ -356,7 +358,8 @@ final class HMSTool {
       client.getAllTables(database, tableName)
           .stream()
           .sorted()
-          .forEach(tblName -> client.dropTableNoException(dbName, tblName));
+          .forEach(tblName ->
+              throwingSupplierWrapper(() -> client.dropTable(dbName, tblName)));
     }
   }
 

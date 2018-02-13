@@ -41,6 +41,7 @@ import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 
+import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
@@ -138,12 +139,12 @@ public class JMHBenchmark {
 
   @Benchmark
   public void getAllDatabases() {
-    client.getAllDatabasesNoException();
+    throwingSupplierWrapper(() -> client.getAllDatabases(null));
   }
 
   @Benchmark
   public void getAllTables() {
-    client.getAllTablesNoException(dbName);
+    throwingSupplierWrapper(() -> client.getAllTables(dbName, null));
   }
 
   @Benchmark

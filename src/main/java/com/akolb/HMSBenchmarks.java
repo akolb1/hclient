@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.addManyPartitionsNoException;
 import static com.akolb.Util.createSchema;
@@ -47,13 +48,15 @@ final class HMSBenchmarks {
 
   static DescriptiveStatistics benchmarkListDatabases(MicroBenchmark benchmark,
                                                       final HMSClient client) {
-    return benchmark.measure(client::getAllDatabasesNoException);
+    return benchmark.measure(() ->
+        throwingSupplierWrapper(() -> client.getAllDatabases(null)));
   }
 
   static DescriptiveStatistics benchmarkListAllTables(MicroBenchmark benchmark,
                                                       final HMSClient client,
                                                       final String dbName) {
-    return benchmark.measure(() -> client.getAllTablesNoException(dbName));
+    return benchmark.measure(() ->
+        throwingSupplierWrapper(() -> client.getAllTables(dbName, null)));
   }
 
   static DescriptiveStatistics benchmarkTableCreate(MicroBenchmark bench,
@@ -63,8 +66,8 @@ final class HMSBenchmarks {
     Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(null,
-        () -> client.createTableNoException(table),
-        () -> client.dropTableNoException(dbName, tableName));
+        () -> throwingSupplierWrapper(() -> client.createTable(table)),
+        () -> throwingSupplierWrapper(() -> client.dropTable(dbName, tableName)));
   }
 
   static DescriptiveStatistics benchmarkDeleteCreate(MicroBenchmark bench,
@@ -74,8 +77,8 @@ final class HMSBenchmarks {
     Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(
-        () -> client.createTableNoException(table),
-        () -> client.dropTableNoException(dbName, tableName),
+        () -> throwingSupplierWrapper(() -> client.createTable(table)),
+        () -> throwingSupplierWrapper(() -> client.dropTable(dbName, tableName)),
         null);
   }
 
@@ -98,9 +101,10 @@ final class HMSBenchmarks {
                                                  final String tableName) {
     createPartitionedTable(client, dbName, tableName);
     try {
-      return bench.measure(() -> client.getTableNoException(dbName, tableName));
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.getTable(dbName, tableName)));
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -112,7 +116,8 @@ final class HMSBenchmarks {
     String format = "tmp_table_%d";
     try {
       createManyTables(client, count, dbName, format);
-      return bench.measure(() -> client.getAllTablesNoException(dbName));
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.getAllTables(dbName, null)));
     } finally {
       dropManyTables(client, count, dbName, format);
     }
@@ -131,13 +136,13 @@ final class HMSBenchmarks {
           .build();
 
       return bench.measure(null,
-          () -> client.createPartitionNoException(partition),
-          () -> client.dropPartitionNoException(dbName, tableName, values));
+          () -> throwingSupplierWrapper(() -> client.addPartition(partition)),
+          () -> throwingSupplierWrapper(() -> client.dropPartition(dbName, tableName, values)));
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -150,12 +155,13 @@ final class HMSBenchmarks {
       addManyPartitions(client, dbName, tableName,
           Collections.singletonList("d"), 1);
 
-      return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.listPartitions(dbName, tableName)));
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -169,12 +175,13 @@ final class HMSBenchmarks {
       addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
       LOG.debug("Created {} partitions", howMany);
       LOG.debug("started benchmark... ");
-      return bench.measure(() -> client.listPartitionsNoException(dbName, tableName));
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.listPartitions(dbName, tableName)));
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -188,12 +195,13 @@ final class HMSBenchmarks {
       addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
       LOG.debug("Created {} partitions", howMany);
       LOG.debug("started benchmark... ");
-      return bench.measure(() -> client.getPartitionsNoException(dbName, tableName));
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.getPartitions(dbName, tableName)));
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -210,14 +218,14 @@ final class HMSBenchmarks {
           .build();
 
       return bench.measure(
-          () -> client.createPartitionNoException(partition),
-          () -> client.dropPartitionNoException(dbName, tableName, values),
+          () -> throwingSupplierWrapper(() -> client.addPartition(partition)),
+          () -> throwingSupplierWrapper(() -> client.dropPartition(dbName, tableName, values)),
           null);
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -232,10 +240,11 @@ final class HMSBenchmarks {
           null,
           () -> addManyPartitionsNoException(client, dbName, tableName,
               Collections.singletonList("d"), count),
-          () -> client.dropPartitionsNoException(dbName, tableName, null)
+          () -> throwingSupplierWrapper(() ->
+              client.dropPartitions(dbName, tableName, null))
       );
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -249,11 +258,12 @@ final class HMSBenchmarks {
       return bench.measure(
           () -> addManyPartitionsNoException(client, dbName, tableName,
               Collections.singletonList("d"), count),
-          () -> client.dropPartitionsNoException(dbName, tableName, null),
+          () -> throwingSupplierWrapper(() ->
+              client.dropPartitions(dbName, tableName, null)),
           null
       );
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -267,10 +277,10 @@ final class HMSBenchmarks {
       addManyPartitionsNoException(client, dbName, tableName,
           Collections.singletonList("d"), count);
       return bench.measure(
-          () -> client.getPartitionNamesNoException(dbName, tableName)
+          () -> throwingSupplierWrapper(() -> client.getPartitionNames(dbName, tableName))
       );
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -283,12 +293,15 @@ final class HMSBenchmarks {
     try {
       addManyPartitionsNoException(client, dbName, tableName,
           Collections.singletonList("d"), count);
-      List<String> partitionNames = client.getPartitionNamesNoException(dbName, tableName);
+      List<String> partitionNames = throwingSupplierWrapper(() ->
+          client.getPartitionNames(dbName, tableName));
       return bench.measure(
-          () -> client.getPartitionsByNamesNoException(dbName, tableName, partitionNames)
+          () ->
+              throwingSupplierWrapper(() ->
+                  client.getPartitionsByNames(dbName, tableName, partitionNames))
       );
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -309,15 +322,17 @@ final class HMSBenchmarks {
       return bench.measure(
           () -> {
             // Measuring 2 renames, so the tests are idempotent
-            client.alterTableNoException(oldTable.getDbName(), oldTable.getTableName(), newTable);
-            client.alterTableNoException(newTable.getDbName(), newTable.getTableName(), oldTable);
+            throwingSupplierWrapper(() ->
+                client.alterTable(oldTable.getDbName(), oldTable.getTableName(), newTable));
+            throwingSupplierWrapper(() ->
+                client.alterTable(newTable.getDbName(), newTable.getTableName(), oldTable));
           }
       );
     } catch (TException e) {
       e.printStackTrace();
       return new DescriptiveStatistics();
     } finally {
-      client.dropTableNoException(dbName, tableName);
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
   }
 
@@ -325,18 +340,18 @@ final class HMSBenchmarks {
                                                      final HMSClient client,
                                                      final String dbName,
                                                      int count) {
-    client.dropDatabaseNoException(dbName);
+    throwingSupplierWrapper(() -> client.dropDatabase(dbName));
     try {
       return bench.measure(
           () -> {
-            client.createDatabaseNoException(dbName);
+            throwingSupplierWrapper(() -> client.createDatabase(dbName));
             createManyTables(client, count, dbName, "tmp_table_%d");
           },
-          () -> client.dropDatabaseNoException(dbName),
+          () -> throwingSupplierWrapper(() -> client.dropDatabase(dbName)),
           null
       );
     } finally {
-      client.createDatabaseNoException(dbName);
+      throwingSupplierWrapper(() -> client.createDatabase(dbName));
     }
   }
 
@@ -345,33 +360,34 @@ final class HMSBenchmarks {
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
     IntStream.range(0, howMany)
         .forEach(i ->
-            client.createTableNoException(
+            throwingSupplierWrapper(() -> client.createTable(
                 new Util.TableBuilder(dbName, String.format(format, i))
                     .withType(TableType.MANAGED_TABLE)
                     .withColumns(columns)
                     .withPartitionKeys(partitions)
-                    .build()));
+                    .build())));
   }
 
   private static void dropManyTables(HMSClient client, int howMany, String dbName, String format) {
     IntStream.range(0, howMany)
         .forEach(i ->
-            client.dropTableNoException(dbName, String.format(format, i)));
+            throwingSupplierWrapper(() -> client.dropTable(dbName, String.format(format, i))));
   }
 
   // Create a simple table with a single column and single partition
   private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
-    client.createTableNoException(
+    throwingSupplierWrapper(() -> client.createTable(
         new Util.TableBuilder(dbName, tableName)
             .withType(TableType.MANAGED_TABLE)
             .withColumns(createSchema(Collections.singletonList("name:string")))
             .withPartitionKeys(createSchema(Collections.singletonList("date")))
-            .build());
+            .build()));
   }
 
   static DescriptiveStatistics benchmarkGetNotificationId(MicroBenchmark benchmark,
                                                           final HMSClient client) {
-    return benchmark.measure(client::getCurrentNotificationIdNoException);
+    return benchmark.measure(() ->
+        throwingSupplierWrapper(client::getCurrentNotificationId));
   }
 
 }

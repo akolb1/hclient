@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
 final class Util {
@@ -302,7 +303,7 @@ final class Util {
     return new FieldSchema(name, colType, "");
   }
 
-  static void addManyPartitions(@NotNull HMSClient client,
+  static Object addManyPartitions(@NotNull HMSClient client,
                                 @NotNull String dbName,
                                 @NotNull String tableName,
                                 List<String> arguments,
@@ -317,6 +318,7 @@ final class Util {
                             .map(a -> a + i)
                             .collect(Collectors.toList())).build())
             .collect(Collectors.toList()));
+    return null;
   }
 
   static void addManyPartitionsNoException(@NotNull HMSClient client,
@@ -324,10 +326,7 @@ final class Util {
                                            @NotNull String tableName,
                                            List<String> arguments,
                                            int npartitions) {
-    try {
-      addManyPartitions(client, dbName, tableName, arguments, npartitions);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
+    throwingSupplierWrapper(() ->
+        addManyPartitions(client, dbName, tableName, arguments, npartitions));
   }
 }

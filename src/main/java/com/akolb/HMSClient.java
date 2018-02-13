@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 final class HMSClient implements AutoCloseable {
@@ -73,6 +74,30 @@ final class HMSClient implements AutoCloseable {
   private ThriftHiveMetastore.Iface client;
   private TTransport transport;
   private URI serverURI;
+
+  /**
+   * Version if the SUpplier that can throw exceptions
+   * @param <T>
+   * @param <E>
+   */
+  @FunctionalInterface
+  public interface ThrowingSupplier<T, E extends Exception> {
+    T get() throws E;
+  }
+
+  /**
+   * Wrapper that moves all checked exceptions to RuntimeException
+   * @param throwingSupplier Supplier that throws Exception
+   * @param <T> Supplier return type
+   * @return Supplier that throws unchecked exception
+   */
+  public static <T> T throwingSupplierWrapper(ThrowingSupplier<T, Exception> throwingSupplier) {
+    try {
+      return throwingSupplier.get();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   @Override
   public String toString() {
@@ -172,14 +197,6 @@ final class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
-  List<String> getAllDatabasesNoException() {
-    try {
-      return client.get_all_databases();
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.get_all_tables(dbName));
@@ -190,21 +207,13 @@ final class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
-  List<String> getAllTablesNoException(@NotNull String dbName) {
-    try {
-      return client.get_all_tables(dbName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   /**
    * Create database with the given name if it doesn't exist
    *
    * @param name database name
    */
-  void createDatabase(@NotNull String name) throws TException {
-    createDatabase(name, null, null, null);
+  Object createDatabase(@NotNull String name) throws TException {
+    return createDatabase(name, null, null, null);
   }
 
   /**
@@ -215,145 +224,60 @@ final class HMSClient implements AutoCloseable {
    * @param params Database params
    * @throws TException if database exists
    */
-  void createDatabase(@NotNull String name,
+  Object createDatabase(@NotNull String name,
                       @Nullable String description,
                       @Nullable String location,
                       @Nullable Map<String, String> params)
       throws TException {
     Database db = new Database(name, description, location, params);
     client.create_database(db);
+    return null;
   }
 
-  /**
-   * Create database but convert any exception to unchecked RuntimeException.
-   *
-   * @param name database name
-   */
-  void createDatabaseNoException(@NotNull String name) {
-    try {
-      createDatabase(name);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  void dropDatabase(@NotNull String dbName) throws TException {
+  Object dropDatabase(@NotNull String dbName) throws TException {
     client.drop_database(dbName, true, true);
+    return null;
   }
 
-  /**
-   * Drop database but convert any exception to unchecked RuntimeException.
-   *
-   * @param dbName database name
-   */
-  void dropDatabaseNoException(@NotNull String dbName) {
-    try {
-      dropDatabase(dbName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  void createTable(Table table) throws TException {
+  Object createTable(Table table) throws TException {
     client.create_table(table);
+    return null;
   }
 
-  /**
-   * Create table but convert any exception to unchecked {@link RuntimeException}
-   *
-   * @param table table to create
-   */
-  void createTableNoException(@NotNull Table table) {
-    try {
-      createTable(table);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  void dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
+  Object dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     client.drop_table(dbName, tableName, true);
-  }
-
-  /**
-   * Drop table but convert any exception to unchecked {@link RuntimeException}.
-   *
-   * @param dbName    Database name
-   * @param tableName Table name
-   */
-  void dropTableNoException(@NotNull String dbName, @NotNull String tableName) {
-    try {
-      dropTable(dbName, tableName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
+    return null;
   }
 
   Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     return client.get_table(dbName, tableName);
   }
 
-  Table getTableNoException(@NotNull String dbName, @NotNull String tableName) {
-    try {
-      return getTable(dbName, tableName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
+  Partition createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
+    return client.add_partition(new Util.PartitionBuilder(table).setValues(values).build());
   }
 
-  void createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
-    client.add_partition(new Util.PartitionBuilder(table).setValues(values).build());
+  Partition addPartition(@NotNull Partition partition) throws TException {
+    return client.add_partition(partition);
   }
 
   void createPartitions(List<Partition> partitions) throws TException {
     client.add_partitions(partitions);
   }
 
-  void createPartitionNoException(@NotNull Partition partition) {
-    try {
-      client.add_partition(partition);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   List<Partition> listPartitions(@NotNull String dbName,
                                  @NotNull String tableName) throws TException {
     return client.get_partitions(dbName, tableName, (short) -1);
   }
 
-  List<Partition> listPartitionsNoException(@NotNull String dbName, @NotNull String tableName) {
-    try {
-      return listPartitions(dbName, tableName);
-    } catch (TException e) {
-      LOG.error("Failed to list partitions", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  long getCurrentNotificationId() throws TException {
+  Long getCurrentNotificationId() throws TException {
     return client.get_current_notificationEventId().getEventId();
-  }
-
-  long getCurrentNotificationIdNoException() {
-    try {
-      return getCurrentNotificationId();
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   List<String> getPartitionNames(@NotNull String dbName,
                                  @NotNull String tableName) throws TException {
     return client.get_partition_names(dbName, tableName, (short) -1);
-  }
-
-  List<String> getPartitionNamesNoException(@NotNull String dbName, @NotNull String tableName) {
-    try {
-      return getPartitionNames(dbName, tableName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   public boolean dropPartition(@NotNull String dbName, @NotNull String tableName,
@@ -362,25 +286,8 @@ final class HMSClient implements AutoCloseable {
     return client.drop_partition(dbName, tableName, arguments, true);
   }
 
-  public boolean dropPartitionNoException(@NotNull String dbName, @NotNull String tableName,
-                                          @NotNull List<String> arguments) {
-    try {
-      return dropPartition(dbName, tableName, arguments);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   List<Partition> getPartitions(@NotNull String dbName, @NotNull String tableName) throws TException {
     return client.get_partitions(dbName, tableName, (short)-1);
-  }
-
-  List<Partition> getPartitionsNoException(@NotNull String dbName, @NotNull String tableName) {
-    try {
-      return getPartitions(dbName, tableName);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
   }
 
   DropPartitionsResult dropPartitions(@NotNull String dbName, @NotNull String tableName,
@@ -395,15 +302,6 @@ final class HMSClient implements AutoCloseable {
         tableName, RequestPartsSpec.names(partNames)));
   }
 
-  void dropPartitionsNoException(@NotNull String dbName, @NotNull String tableName,
-                                 @Nullable List<String> names) {
-    try {
-      dropPartitions(dbName, tableName, names);
-    } catch (TException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   List<Partition> getPartitionsByNames(@NotNull String dbName, @NotNull String tableName,
                                        @Nullable List<String>names) throws TException {
     if (names == null) {
@@ -413,27 +311,10 @@ final class HMSClient implements AutoCloseable {
     return client.get_partitions_by_names(dbName, tableName, names);
   }
 
-  List<Partition> getPartitionsByNamesNoException(@NotNull String dbName, @NotNull String tableName,
-                                                  @Nullable List<String>names) {
-    try {
-      return getPartitionsByNames(dbName, tableName, names);
-    } catch (TException e) {
-      throw  new RuntimeException(e);
-    }
-  }
-
-  void alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
+  Object alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
       throws TException {
     client.alter_table(dbName, tableName, newTable);
-  }
-
-  void alterTableNoException(@NotNull String dbName, @NotNull String tableName,
-                             @NotNull Table newTable) {
-    try {
-      alterTable(dbName, tableName, newTable);
-    } catch (TException e) {
-      throw  new RuntimeException(e);
-    }
+    return null;
   }
 
   private TTransport open(HiveConf conf, @NotNull URI uri) throws
