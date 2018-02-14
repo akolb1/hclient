@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class HMSClientTest {
   private static final String PARAM_NAME = "param";
   private static final String VALUE_NAME = "value";
-  private static final String TEST_DATABASE="hmsclienttest";
+  private static final String TEST_DATABASE="hmsClientTest";
   private static final String TEST_DATABASE_DESCRIPTION="hmsclienttest description";
   private static final ImmutableMap<String, String> TEST_DATABASE_PARAMS =
       new ImmutableMap.Builder<String, String>()
@@ -65,8 +65,9 @@ class HMSClientTest {
   void getAllDatabases() throws Exception {
     Set<String> databases = client.getAllDatabases(null);
     assertThat(databases, hasItem("default"));
-    assertThat(databases, hasItem(TEST_DATABASE));
-    assertThat(client.getAllDatabases(TEST_DATABASE), contains(TEST_DATABASE));
+    System.out.println(databases);
+    assertThat(databases, hasItem(TEST_DATABASE.toLowerCase()));
+    assertThat(client.getAllDatabases(TEST_DATABASE.toLowerCase()), contains(TEST_DATABASE.toLowerCase()));
   }
 
   /**
@@ -114,7 +115,7 @@ class HMSClientTest {
     assertThat(db.getName(), equalToIgnoringCase(TEST_DATABASE));
     assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
     assertThat(db.getParameters(), equalTo(TEST_DATABASE_PARAMS));
-    assertThat(db.getLocationUri(), containsString(TEST_DATABASE));
+    assertThat(db.getLocationUri(), containsString(TEST_DATABASE.toLowerCase()));
   }
 
   /**
@@ -126,7 +127,7 @@ class HMSClientTest {
     assertThat(db.getName(), equalToIgnoringCase(TEST_DATABASE));
     assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
     assertThat(db.getParameters(), equalTo(TEST_DATABASE_PARAMS));
-    assertThat(db.getLocationUri(), containsString(TEST_DATABASE));
+    assertThat(db.getLocationUri(), containsString(TEST_DATABASE.toLowerCase()));
   }
 
   /**
