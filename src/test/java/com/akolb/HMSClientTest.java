@@ -3,6 +3,9 @@ package com.akolb;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -41,8 +44,11 @@ class HMSClientTest {
     // Create client and default test database
     client =
         new HMSClient(getServerUri(null, null), null);
-    client.createDatabase(TEST_DATABASE, TEST_DATABASE_DESCRIPTION, null,
-        TEST_DATABASE_PARAMS);
+    Database db = new Util.DatabaseBuilder(TEST_DATABASE)
+        .withDescription(TEST_DATABASE_DESCRIPTION)
+        .withParams(TEST_DATABASE_PARAMS)
+        .build();
+    client.createDatabase(db);
   }
 
   @AfterAll
@@ -73,6 +79,32 @@ class HMSClientTest {
   }
 
   /**
+   * Creating a database with null name should not be allowed
+   * and should throw MetaException.
+   */
+  @Test
+  void createDatabaseNullName() {
+    Database db = new Util.DatabaseBuilder(TEST_DATABASE)
+        .build();
+    db.setName(null);
+    Throwable exception = assertThrows(MetaException.class,
+        () -> client.createDatabase(db));
+  }
+
+  /**
+   * Creating a database with an empty name should not be allowed
+   * and should throw InvalidObjectException
+   */
+  @Test
+  void createDatabaseEmptyName() {
+    Database db = new Util.DatabaseBuilder(TEST_DATABASE)
+        .build();
+    db.setName("");
+    Throwable exception = assertThrows(InvalidObjectException.class,
+        () -> client.createDatabase(db));
+  }
+
+  /**
    * Verify that getDatabase() returns all expected fields
    * @throws TException if fails to get database info
    */
@@ -83,6 +115,39 @@ class HMSClientTest {
     assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
     assertThat(db.getParameters(), equalTo(TEST_DATABASE_PARAMS));
     assertThat(db.getLocationUri(), containsString(TEST_DATABASE));
+  }
+
+  /**
+   * Verify that locating database is case-insensitive
+   */
+  @Test
+  void getDatabaseCI() throws TException {
+    Database db = client.getDatabase(TEST_DATABASE.toUpperCase());
+    assertThat(db.getName(), equalToIgnoringCase(TEST_DATABASE));
+    assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
+    assertThat(db.getParameters(), equalTo(TEST_DATABASE_PARAMS));
+    assertThat(db.getLocationUri(), containsString(TEST_DATABASE));
+  }
+
+  /**
+   * Verify that searching for non-existing database throws
+   * NoSuchObjectException
+   */
+  @Test
+  void getNonExistingDb() {
+    Throwable exception = assertThrows(NoSuchObjectException.class,
+        () -> client.getDatabase("WhatIsThisDatabase"));
+  }
+
+
+  /**
+   * Verify that dropping for non-existing database throws
+   * NoSuchObjectException
+   */
+  @Test
+  void dropNonExistingDb() {
+    Throwable exception = assertThrows(NoSuchObjectException.class,
+        () -> client.dropDatabase("WhatIsThisDatabase"));
   }
 
   @Test
