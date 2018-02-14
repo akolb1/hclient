@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 final class HMSClient implements AutoCloseable {
@@ -212,7 +211,7 @@ final class HMSClient implements AutoCloseable {
    *
    * @param name database name
    */
-  Object createDatabase(@NotNull String name) throws TException {
+  boolean createDatabase(@NotNull String name) throws TException {
     return createDatabase(name, null, null, null);
   }
 
@@ -224,29 +223,34 @@ final class HMSClient implements AutoCloseable {
    * @param params Database params
    * @throws TException if database exists
    */
-  Object createDatabase(@NotNull String name,
+  boolean createDatabase(@NotNull String name,
                       @Nullable String description,
                       @Nullable String location,
                       @Nullable Map<String, String> params)
       throws TException {
     Database db = new Database(name, description, location, params);
     client.create_database(db);
-    return null;
+    return true;
   }
 
-  Object dropDatabase(@NotNull String dbName) throws TException {
+  boolean createDatabase(Database db) throws TException {
+    client.create_database(db);
+    return true;
+  }
+
+  boolean dropDatabase(@NotNull String dbName) throws TException {
     client.drop_database(dbName, true, true);
-    return null;
+    return true;
   }
 
-  Object createTable(Table table) throws TException {
+  boolean createTable(Table table) throws TException {
     client.create_table(table);
-    return null;
+    return true;
   }
 
-  Object dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
+  boolean dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     client.drop_table(dbName, tableName, true);
-    return null;
+    return true;
   }
 
   Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
@@ -311,10 +315,10 @@ final class HMSClient implements AutoCloseable {
     return client.get_partitions_by_names(dbName, tableName, names);
   }
 
-  Object alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
+  boolean alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
       throws TException {
     client.alter_table(dbName, tableName, newTable);
-    return null;
+    return true;
   }
 
   private TTransport open(HiveConf conf, @NotNull URI uri) throws

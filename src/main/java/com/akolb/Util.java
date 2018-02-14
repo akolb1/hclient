@@ -21,8 +21,10 @@ package com.akolb;
 import com.google.common.base.Joiner;
 import com.google.common.net.HostAndPort;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -59,6 +61,72 @@ final class Util {
   private static final String PROP_PORT = "hms.port";
 
   private static final Logger LOG = LoggerFactory.getLogger(Util.class);
+
+  /**
+   * A builder for Database.  The name of the new database is required.  Everything else
+   * selects reasonable defaults.
+   * This is a modified version of Hive 3.0 DatabaseBuilder.
+   */
+  public static class DatabaseBuilder {
+    private String name;
+    private String description;
+    private String location;
+    private String ownerName;
+    private PrincipalType ownerType;
+    private Map<String, String> params = null;
+
+    private DatabaseBuilder() {
+    }
+
+    public DatabaseBuilder(String name) {
+      this.name = name;
+      ownerType = PrincipalType.USER;
+    }
+
+    public DatabaseBuilder withDescription(String description) {
+      this.description = description;
+      return this;
+    }
+
+    public DatabaseBuilder withLocation(String location) {
+      this.location = location;
+      return this;
+    }
+
+    public DatabaseBuilder withParams(Map<String, String> params) {
+      this.params = params;
+      return this;
+    }
+
+    public DatabaseBuilder withParam(String key, String val) {
+      if (this.params == null) {
+        this.params = new HashMap<>();
+      }
+      this.params.put(key, val);
+      return this;
+    }
+
+    public DatabaseBuilder withOwnerName(String ownerName) {
+      this.ownerName = ownerName;
+      return this;
+    }
+
+    public DatabaseBuilder withOwnerType(PrincipalType ownerType) {
+      this.ownerType = ownerType;
+      return this;
+    }
+
+    public Database build() {
+      Database db = new Database(name, description, location, params);
+      if (ownerName != null) {
+        db.setOwnerName(ownerName);
+      }
+      if (ownerType != null) {
+        db.setOwnerType(ownerType);
+      }
+      return db;
+    }
+  }
 
   static class TableBuilder {
     private final String dbName;
