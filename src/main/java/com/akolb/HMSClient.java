@@ -74,6 +74,10 @@ final class HMSClient implements AutoCloseable {
   private TTransport transport;
   private URI serverURI;
 
+  public URI getServerURI() {
+    return serverURI;
+  }
+
   /**
    * Version if the SUpplier that can throw exceptions
    * @param <T>

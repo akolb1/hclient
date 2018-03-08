@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.akolb.HMSBenchmarks.benchmarkConcurrentPartitionOps;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
@@ -92,7 +93,7 @@ final class HMSBenchmark {
   private static final String OPT_OUTPUT = "output";
   private static final String OPT_CSV = "csv";
   private static final String OPT_SAVEDATA = "savedata";
-
+  private static final String OPT_THREADS = "threads";
 
   public static void main(String[] args) throws Exception {
     Options options = new Options();
@@ -108,6 +109,7 @@ final class HMSBenchmark {
         .addOption("W", OPT_WARM, true, "warmup count")
         .addOption("l", OPT_LIST, true, "list benchmarks")
         .addOption("o", OPT_OUTPUT, true, "output file")
+        .addOption("T", OPT_THREADS, true, "numberOfThreads")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SANITIZE, false, "sanitize results"))
         .addOption(new Option(OPT_CSV, false, "produce CSV output"))
@@ -162,10 +164,11 @@ final class HMSBenchmark {
       }
 
       int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
+      int nThreads =  Integer.parseInt(cmd.getOptionValue(OPT_THREADS, "2"));
       int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
       int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
       LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
-          " spin " + spin);
+          " spin " + spin + " threads " + nThreads);
 
       final String db = dbName;
       final String tbl = tableName;
@@ -218,6 +221,8 @@ final class HMSBenchmark {
               () -> benchmarkDropDatabase(bench, client, db, 1))
           .add("dropDatabase" + '.' + instances,
               () -> benchmarkDropDatabase(bench, client, db, instances))
+          .add("concurrentPartitionAdd" + "#" + nThreads,
+              () -> benchmarkConcurrentPartitionOps(bench, client, db, tbl, instances, nThreads))
           .runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {

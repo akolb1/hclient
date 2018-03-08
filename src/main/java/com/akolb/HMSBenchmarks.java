@@ -29,16 +29,20 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 
 import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.addManyPartitionsNoException;
 import static com.akolb.Util.createSchema;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 /**
  * Actual benchmark code.
@@ -355,6 +359,23 @@ final class HMSBenchmarks {
     }
   }
 
+  static DescriptiveStatistics benchmarkConcurrentPartitionOps(MicroBenchmark bench,
+                                                               final HMSClient client,
+                                                               final String dbName,
+                                                               final String tableName,
+                                                               int instances, int nThreads) {
+    ExecutorService executor = newFixedThreadPool(nThreads);
+    createPartitionedTable(client, dbName, tableName);
+    try {
+      Table tbl = throwingSupplierWrapper(() -> client.getTable(dbName, tableName));
+      return bench.measure(() -> executeAddPartitions(client.getServerURI(), executor, tbl,
+          instances, nThreads));
+    } finally {
+      executor.shutdownNow();
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
+    }
+  }
+
   private static void createManyTables(HMSClient client, int howMany, String dbName, String format) {
     List<FieldSchema> columns = createSchema(new ArrayList<>(Arrays.asList("name", "string")));
     List<FieldSchema> partitions = createSchema(new ArrayList<>(Arrays.asList("date", "string")));
@@ -388,6 +409,32 @@ final class HMSBenchmarks {
                                                           final HMSClient client) {
     return benchmark.measure(() ->
         throwingSupplierWrapper(client::getCurrentNotificationId));
+  }
+
+  private static void executeAddPartitions(URI uri, ExecutorService executor,
+                                           Table tbl,
+                                           int instances, int count) {
+    List<Future<Boolean>> results = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      final int j = i;
+      results.add(executor.submit(() -> addDropPartitions(uri, tbl, instances, j)));
+    }
+    // Wait for results
+    results.forEach(r -> throwingSupplierWrapper(r::get));
+  }
+
+  private static boolean addDropPartitions(URI uri, Table tbl, int instances, int instance) {
+    final List<String> values = Collections.singletonList("d" + instance);
+    Partition partition = new Util.PartitionBuilder(tbl).setValues(values).build();
+    try (HMSClient client = new HMSClient(uri)) {
+      for (int i = 0; i < instances; i++) {
+        client.addPartition(partition);
+        client.dropPartition(partition.getDbName(), partition.getTableName(), values);
+      }
+      return true;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
 }

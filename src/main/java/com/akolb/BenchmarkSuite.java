@@ -172,7 +172,7 @@ public final class BenchmarkSuite {
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
 
-    fmt.format("%-30s %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g %-6.3g%n",
+    fmt.format("%-30s %-8.4g %-8.4g %-8.4g %-8.4g %-8.4g %-8.4g%n",
         name,
         (mean - minMean) / conv,
         mean / conv,
@@ -198,7 +198,7 @@ public final class BenchmarkSuite {
   }
 
   BenchmarkSuite display(Formatter fmt) {
-    fmt.format("%-30s %-6s %-6s %-6s %-6s %-6s %-6s%n",
+    fmt.format("%-30s %-8s %-8s %-8s %-8s %-8s %-8s%n",
         "Operation", "AMean", "Mean", "Med", "Min", "Max", "Err%");
     minMean = minMean();
     result.forEach((name, stat) -> displayStats(fmt, name, stat));
