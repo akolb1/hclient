@@ -18,6 +18,7 @@
 
 package com.akolb;
 
+import com.akolb.Util.PartitionBuilder;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +33,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hive.common.LogUtils;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
@@ -55,11 +57,13 @@ final class HMSTool {
   static final String OPT_HOST = "host";
   static final String OPT_PORT = "port";
   static final String OPT_PARTITIONS = "partitions";
+  static final String OPT_COLUMNS = "columns";
   static final String OPT_DATABASE = "database";
   static final String OPT_TABLE = "table";
   static final String OPT_DROP = "drop";
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
+  static final String OPT_PRELOAD_RATIO = "preload";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
   private static final String OPT_SHOW_PARTS = "showparts";
@@ -73,6 +77,7 @@ final class HMSTool {
   private static final String CMD_LIST_NID = "currnid";
   private static final String CMD_RENAME = "rename";
   private static final String CMD_DROPDB = "dropdb";
+  private static final String CMD_LOAD_TABLE = "load";
 
 
   public static void main(String[] args) throws Exception {
@@ -80,12 +85,14 @@ final class HMSTool {
     options.addOption("H", OPT_HOST, true, "HMS Server")
         .addOption("P", OPT_PORT, true, "HMS Server port")
         .addOption("p", OPT_PARTITIONS, true, "partitions list")
+        .addOption("c", OPT_COLUMNS, true, "column schema")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
+        .addOption("pl", OPT_PRELOAD_RATIO, true, "Number of partitions to be preloaded")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SHOW_PARTS, false, "show partitions"))
         .addOption("D", OPT_DROP, false, "drop table if exists");
@@ -139,6 +146,9 @@ final class HMSTool {
         case CMD_DROPDB:
           cmdDropDatabase(client, cmd);
           break;
+      case CMD_LOAD_TABLE:
+        cmdLoadTable(cmd, arguments);
+        break;
         default:
           LOG.warn("Unknown command '" + command + "'");
           System.exit(1);
@@ -221,15 +231,8 @@ final class HMSTool {
         new ArrayList<>(Arrays.asList(partitions));
 
     if (!multiple) {
-      if (client.tableExists(dbName, tableName)) {
-        if (cmd.hasOption(OPT_DROP)) {
-          LOG.warn("Dropping existing table '" + tableName + "'");
-          client.dropTable(dbName, tableName);
-        } else {
-          LOG.warn("Table '" + tableName + "' already exist");
-          return;
-        }
-      }
+      if (dropTableIfExists(client, cmd, dbName, tableName))
+        return;
 
       client.createTable(new Util.TableBuilder(dbName, tableName)
           .withColumns(createSchema(arguments))
@@ -260,6 +263,20 @@ final class HMSTool {
     }
   }
 
+  private static boolean dropTableIfExists(HMSClient client, CommandLine cmd, String dbName,
+      String tableName) throws TException {
+    if (client.tableExists(dbName, tableName)) {
+      if (cmd.hasOption(OPT_DROP)) {
+        LOG.warn("Dropping existing table '" + tableName + "'");
+        client.dropTable(dbName, tableName);
+      } else {
+        LOG.warn("Table '" + tableName + "' already exist");
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static void cmdAddPart(HMSClient client, CommandLine cmd, List<String> arguments)
       throws TException {
     String dbName = cmd.getOptionValue(OPT_DATABASE);
@@ -277,6 +294,68 @@ final class HMSTool {
     } else {
       addPartition(client, dbName, tableName, arguments);
     }
+  }
+
+  private static void cmdLoadTable(CommandLine cmd, List<String> arguments) throws Exception {
+    String dbName = cmd.getOptionValue(OPT_DATABASE);
+    String tableName = cmd.getOptionValue(OPT_TABLE);
+
+    if (tableName != null && tableName.contains(".")) {
+      String[] parts = tableName.split("\\.");
+      dbName = parts[0];
+      tableName = parts[1];
+    }
+    int nOldPartitions = 100;
+    if (cmd.hasOption(OPT_PRELOAD_RATIO)) {
+      nOldPartitions = Integer.parseInt(cmd.getOptionValue(OPT_PRELOAD_RATIO));
+    }
+
+    List<String> columnsInfo;
+    if (cmd.hasOption(OPT_COLUMNS)) {
+      String columns = cmd.getOptionValue(OPT_COLUMNS);
+      String[] partitions = columns == null ? null : columns.split(",");
+      columnsInfo =
+          partitions == null ? Collections.emptyList() : new ArrayList<>(Arrays.asList(partitions));
+    } else {
+      LOG.error("Columns options is needed");
+      return;
+    }
+
+    List<String> partitionInfo;
+    if (cmd.hasOption(OPT_PARTITIONS)) {
+      String partitionsInfo = cmd.getOptionValue(OPT_PARTITIONS);
+      String[] partitions = partitionsInfo == null ? null : partitionsInfo.split(",");
+      partitionInfo =
+          partitions == null ? Collections.emptyList() : new ArrayList<>(Arrays.asList(partitions));
+    } else {
+      LOG.warn("Partitions info is needed");
+      return;
+    }
+    try (HMSClient client = new HMSClient(
+        getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
+        cmd.getOptionValue(OPT_CONF))) {
+
+      dropTableIfExists(client, cmd, dbName, tableName);
+      System.out.println("Creating table " + dbName + ":" + tableName);
+      client.createTable(
+          new Util.TableBuilder(dbName, tableName).withColumns(createSchema(columnsInfo))
+              .withPartitionKeys(createSchema(partitionInfo)).build());
+      Table table = client.getTable(dbName, tableName);
+      //one alter partition event for each getPartition event during MoveTask
+      List<String> values = new ArrayList<>(1);
+      List<Partition> partitions = new ArrayList<>(nOldPartitions);
+      for (int i = 0; i < nOldPartitions; i++) {
+        values.add(String.valueOf(i));
+        client.createPartition(table, values);
+        Partition partition = new PartitionBuilder(table).setValues(values).build();
+        client.alterPartition(dbName, tableName, partition);
+        partitions.add(partition);
+        values.clear();
+      }
+      //one alter_partitions call to simulate stats task
+      client.alterPartitions(dbName, tableName, partitions);
+    }
+
   }
 
   private static void cmdDrop(HMSClient client, CommandLine cmd, List<String> arguments)
@@ -352,7 +431,7 @@ final class HMSTool {
   }
 
 
-    private static void dropTables(HMSClient client, String dbName, String tableName)
+  private static void dropTables(HMSClient client, String dbName, String tableName)
       throws TException {
     for (String database : client.getAllDatabases(dbName)) {
       client.getAllTables(database, tableName)

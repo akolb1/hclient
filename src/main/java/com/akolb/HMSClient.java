@@ -325,6 +325,16 @@ final class HMSClient implements AutoCloseable {
     return true;
   }
 
+  void alterPartition(@NotNull String dbName, @NotNull String tableName,
+      @NotNull Partition partition) throws TException {
+    client.alter_partition(dbName, tableName, partition);
+  }
+
+  void alterPartitions(@NotNull String dbName, @NotNull String tableName,
+      @NotNull List<Partition> partitions) throws TException {
+    client.alter_partitions(dbName, tableName, partitions);
+  }
+
   private TTransport open(HiveConf conf, @NotNull URI uri) throws
       TException, IOException, LoginException {
     boolean useSasl = conf.getBoolVar(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL);
