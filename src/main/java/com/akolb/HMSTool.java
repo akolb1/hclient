@@ -25,6 +25,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -43,6 +46,7 @@ import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.createSchema;
 import static com.akolb.Util.getServerUri;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 // TODO Handle HADOOP_CONF_DIR and HADOOP_HOME
 
@@ -66,6 +70,7 @@ final class HMSTool {
   static final String OPT_PRELOAD_RATIO = "preloadRatio";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
+  static final String OPT_CLIENTS = "numClients";
   private static final String OPT_SHOW_PARTS = "showparts";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
@@ -86,6 +91,7 @@ final class HMSTool {
         .addOption("P", OPT_PORT, true, "HMS Server port")
         .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("c", OPT_COLUMNS, true, "column schema")
+        .addOption("nC", OPT_CLIENTS, true, "Number of clients to perform concurrent worklaods")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
@@ -358,17 +364,39 @@ final class HMSTool {
       partitionInfo =
           partitions == null ? Collections.emptyList() : new ArrayList<>(Arrays.asList(partitions));
     } else {
-      LOG.warn("Partitions info is needed");
+      LOG.error("Partitions info is needed");
       return;
     }
+
+    int numClients = Integer.parseInt(cmd.getOptionValue(OPT_CLIENTS, "5"));
+    //preloading step doesn't need to multi-threaded
     try (HMSClient client = new HMSClient(
         getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
         cmd.getOptionValue(OPT_CONF))) {
-      preLoadOperations(client, cmd, dbName, tableName, preLoadedPartitions, partitionInfo, columnsInfo);
+      for (int i=1; i<=numClients; i++) {
+        preLoadOperations(client, cmd, dbName, getPrefixedTableName(i, tableName), preLoadedPartitions, partitionInfo,
+            columnsInfo);
+      }
+    }
+    //now simulate multiple insert overwrite metadata operations
+    loadTableInParallel(cmd, totalPartitions, dbName, tableName, numClients, preLoadedPartitions);
+  }
 
-      List<Partition> partitions = new ArrayList<>(totalPartitions);
-      // insert overwrite simulation begins here. It will alter preLoadedPartitions partitions
-      // and create (totalPartitions - preLoadedPartitions) new partitions
+  private static String getPrefixedTableName(int i, String tableName) {
+    return new StringBuilder("client_")
+        .append(i)
+        .append("_")
+        .append(tableName).toString();
+  }
+
+  private static void loadTable(final CommandLine cmd, final int totalPartitions,
+      final String dbName, final String tableName, final int preLoadedPartitions) throws Exception {
+    List<Partition> partitions = new ArrayList<>(totalPartitions);
+    // insert overwrite simulation begins here. It will alter preLoadedPartitions partitions
+    // and create (totalPartitions - preLoadedPartitions) new partitions
+    try (HMSClient client = new HMSClient(
+        getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
+        cmd.getOptionValue(OPT_CONF))) {
       List<String> values = new ArrayList<>(1);
       Table table = client.getTable(dbName, tableName);
       for (int i = 0; i < totalPartitions; i++) {
@@ -387,7 +415,30 @@ final class HMSTool {
       //one alter_partitions call to simulate stats task
       client.alterPartitions(dbName, tableName, partitions);
     }
+  }
 
+  private static void loadTableInParallel(final CommandLine cmd, final int totalPartitions,
+      final String dbName, final String tableName, final int numClients,
+      final int preloadedPartitions) {
+    ExecutorService executor = newFixedThreadPool(numClients);
+    try {
+      List<Future<?>> results = new ArrayList<>();
+      //start from 1 till numClients
+      for (int i = 1; i <= numClients; i++) {
+        final int j = i;
+        results.add(executor.submit(() -> {
+          try {
+            loadTable(cmd, totalPartitions, dbName, getPrefixedTableName(j, tableName), preloadedPartitions);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        }));
+      }
+      // Wait for results
+      results.forEach(r -> throwingSupplierWrapper(r::get));
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   private static void cmdDrop(HMSClient client, CommandLine cmd, List<String> arguments)
