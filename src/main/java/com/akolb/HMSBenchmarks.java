@@ -359,6 +359,24 @@ final class HMSBenchmarks {
     }
   }
 
+  static DescriptiveStatistics benchmarkConcurrentSimulateLoadPartitionedTable(MicroBenchmark bench,
+      final HMSClient client, final String dbName, final String tableName, int instances,
+      int nThreads, int numOldPartitions, int numNewPartitions) {
+    ExecutorService executor = newFixedThreadPool(nThreads);
+    createPartitionedTable(client, dbName, tableName);
+    List<String> args = new ArrayList<>();
+    args.add("part:int");
+    throwingSupplierWrapper(() -> addManyPartitions(client, dbName, tableName, args, numOldPartitions));
+    try {
+      Table tbl = throwingSupplierWrapper(() -> client.getTable(dbName, tableName));
+      return bench.measure(() -> executeAddPartitions(client.getServerURI(), executor, tbl,
+          instances, nThreads));
+    } finally {
+      executor.shutdownNow();
+      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
+    }
+  }
+
   static DescriptiveStatistics benchmarkConcurrentPartitionOps(MicroBenchmark bench,
                                                                final HMSClient client,
                                                                final String dbName,

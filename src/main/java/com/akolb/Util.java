@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -247,6 +248,11 @@ final class Util {
 
     PartitionBuilder setValues(List<String> values) {
       this.values = values;
+      return this;
+    }
+
+    PartitionBuilder copyValues(List<String> values) {
+      this.values = new ArrayList<>(values);
       return this;
     }
 
