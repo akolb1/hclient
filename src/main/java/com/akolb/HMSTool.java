@@ -63,7 +63,7 @@ final class HMSTool {
   static final String OPT_DROP = "drop";
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
-  static final String OPT_PRELOAD_RATIO = "preload";
+  static final String OPT_PRELOAD_RATIO = "preloadRatio";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
   private static final String OPT_SHOW_PARTS = "showparts";
@@ -92,7 +92,7 @@ final class HMSTool {
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
-        .addOption("pl", OPT_PRELOAD_RATIO, true, "Number of partitions to be preloaded")
+        .addOption("pR", OPT_PRELOAD_RATIO, true, "Number of partitions to be preloaded")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SHOW_PARTS, false, "show partitions"))
         .addOption("D", OPT_DROP, false, "drop table if exists");
@@ -296,6 +296,30 @@ final class HMSTool {
     }
   }
 
+  private static void preLoadOperations(HMSClient client, CommandLine cmd, String dbName,
+      String tableName, int preLoadedPartitions, List<String> partitionInfo,
+      List<String> columnsInfo) throws Exception {
+
+    dropTableIfExists(client, cmd, dbName, tableName);
+    System.out.println("Creating table " + dbName + ":" + tableName);
+    client.createTable(
+        new Util.TableBuilder(dbName, tableName).withColumns(createSchema(columnsInfo))
+            .withPartitionKeys(createSchema(partitionInfo)).build());
+    Table table = client.getTable(dbName, tableName);
+    //one alter partition event for each getPartition event during MoveTask
+    List<String> values = new ArrayList<>(1);
+    System.out.println(String
+        .format("Preloading table %s : %s with %d partitions", dbName, tableName,
+            preLoadedPartitions));
+    for (int i = 0; i < preLoadedPartitions; i++) {
+      values.add(String.valueOf(i));
+      Partition partition = new PartitionBuilder(table).copyValues(values).build();
+      //simulates existing partitions of the table
+      client.appendPartition(dbName, tableName, values);
+      values.clear();
+    }
+  }
+
   private static void cmdLoadTable(CommandLine cmd, List<String> arguments) throws Exception {
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = cmd.getOptionValue(OPT_TABLE);
@@ -305,11 +329,17 @@ final class HMSTool {
       dbName = parts[0];
       tableName = parts[1];
     }
-    int nOldPartitions = 100;
-    if (cmd.hasOption(OPT_PRELOAD_RATIO)) {
-      nOldPartitions = Integer.parseInt(cmd.getOptionValue(OPT_PRELOAD_RATIO));
+    int totalPartitions = 100;
+    if (cmd.hasOption(OPT_NUMBER)) {
+      totalPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
     }
 
+    double preLoadRatio = 0.5D;
+    if (cmd.hasOption(OPT_PRELOAD_RATIO)) {
+      preLoadRatio = Double.parseDouble(cmd.getOptionValue(OPT_PRELOAD_RATIO));
+    }
+    assert (preLoadRatio > 0 && preLoadRatio < 1.0);
+    int preLoadedPartitions = (int) (preLoadRatio * totalPartitions);
     List<String> columnsInfo;
     if (cmd.hasOption(OPT_COLUMNS)) {
       String columns = cmd.getOptionValue(OPT_COLUMNS);
@@ -334,21 +364,23 @@ final class HMSTool {
     try (HMSClient client = new HMSClient(
         getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
         cmd.getOptionValue(OPT_CONF))) {
+      preLoadOperations(client, cmd, dbName, tableName, preLoadedPartitions, partitionInfo, columnsInfo);
 
-      dropTableIfExists(client, cmd, dbName, tableName);
-      System.out.println("Creating table " + dbName + ":" + tableName);
-      client.createTable(
-          new Util.TableBuilder(dbName, tableName).withColumns(createSchema(columnsInfo))
-              .withPartitionKeys(createSchema(partitionInfo)).build());
-      Table table = client.getTable(dbName, tableName);
-      //one alter partition event for each getPartition event during MoveTask
+      List<Partition> partitions = new ArrayList<>(totalPartitions);
+      // insert overwrite simulation begins here. It will alter preLoadedPartitions partitions
+      // and create (totalPartitions - preLoadedPartitions) new partitions
       List<String> values = new ArrayList<>(1);
-      List<Partition> partitions = new ArrayList<>(nOldPartitions);
-      for (int i = 0; i < nOldPartitions; i++) {
+      Table table = client.getTable(dbName, tableName);
+      for (int i = 0; i < totalPartitions; i++) {
         values.add(String.valueOf(i));
-        client.createPartition(table, values);
-        Partition partition = new PartitionBuilder(table).setValues(values).build();
-        client.alterPartition(dbName, tableName, partition);
+        Partition partition = new PartitionBuilder(table).copyValues(values).build();
+        if (i < preLoadedPartitions) {
+          //partition is preloaded so treat it as a static partition alter
+          client.alterPartition(dbName, tableName, partition);
+        } else {
+          //add the new dynamic partition
+          client.appendPartition(dbName, tableName, values);
+        }
         partitions.add(partition);
         values.clear();
       }
