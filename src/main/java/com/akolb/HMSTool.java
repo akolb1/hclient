@@ -319,7 +319,7 @@ final class HMSTool {
             preLoadedPartitions));
     for (int i = 0; i < preLoadedPartitions; i++) {
       values.add(String.valueOf(i));
-      Partition partition = new PartitionBuilder(table).copyValues(values).build();
+      Partition partition = new PartitionBuilder(table).withValues(values).build();
       //simulates existing partitions of the table
       client.appendPartition(dbName, tableName, values);
       values.clear();
@@ -401,7 +401,7 @@ final class HMSTool {
       Table table = client.getTable(dbName, tableName);
       for (int i = 0; i < totalPartitions; i++) {
         values.add(String.valueOf(i));
-        Partition partition = new PartitionBuilder(table).copyValues(values).build();
+        Partition partition = new PartitionBuilder(table).withValues(values).build();
         if (i < preLoadedPartitions) {
           //partition is preloaded so treat it as a static partition alter
           client.alterPartition(dbName, tableName, partition);

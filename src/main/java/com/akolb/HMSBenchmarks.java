@@ -42,6 +42,7 @@ import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static com.akolb.Util.addManyPartitions;
 import static com.akolb.Util.addManyPartitionsNoException;
 import static com.akolb.Util.createSchema;
+import static com.akolb.Util.generatePartitionNames;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 /**
@@ -136,7 +137,7 @@ final class HMSBenchmarks {
     try {
       Table t = client.getTable(dbName, tableName);
       Partition partition = new Util.PartitionBuilder(t)
-          .setValues(values)
+          .withValues(values)
           .build();
 
       return bench.measure(null,
@@ -218,7 +219,7 @@ final class HMSBenchmarks {
     try {
       Table t = client.getTable(dbName, tableName);
       Partition partition = new Util.PartitionBuilder(t)
-          .setValues(values)
+          .withValues(values)
           .build();
 
       return bench.measure(
@@ -359,24 +360,6 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkConcurrentSimulateLoadPartitionedTable(MicroBenchmark bench,
-      final HMSClient client, final String dbName, final String tableName, int instances,
-      int nThreads, int numOldPartitions, int numNewPartitions) {
-    ExecutorService executor = newFixedThreadPool(nThreads);
-    createPartitionedTable(client, dbName, tableName);
-    List<String> args = new ArrayList<>();
-    args.add("part:int");
-    throwingSupplierWrapper(() -> addManyPartitions(client, dbName, tableName, args, numOldPartitions));
-    try {
-      Table tbl = throwingSupplierWrapper(() -> client.getTable(dbName, tableName));
-      return bench.measure(() -> executeAddPartitions(client.getServerURI(), executor, tbl,
-          instances, nThreads));
-    } finally {
-      executor.shutdownNow();
-      throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
-    }
-  }
-
   static DescriptiveStatistics benchmarkConcurrentPartitionOps(MicroBenchmark bench,
                                                                final HMSClient client,
                                                                final String dbName,
@@ -442,13 +425,12 @@ final class HMSBenchmarks {
   }
 
   private static boolean addDropPartitions(URI uri, Table tbl, int instances, int instance) {
-    final List<String> values = Collections.singletonList("d" + instance);
-    Partition partition = new Util.PartitionBuilder(tbl).setValues(values).build();
+    List<Partition> partitions = Util.createManyPartitions(tbl,
+        Collections.singletonList("d"+instance), instances);
     try (HMSClient client = new HMSClient(uri)) {
-      for (int i = 0; i < instances; i++) {
-        client.addPartition(partition);
-        client.dropPartition(partition.getDbName(), partition.getTableName(), values);
-      }
+      client.addPartitions(partitions);
+      client.dropPartitions(tbl.getDbName(), tbl.getTableName(),
+          generatePartitionNames("date=d"+instance, instances));
       return true;
     } catch (Exception e) {
       throw new RuntimeException(e);

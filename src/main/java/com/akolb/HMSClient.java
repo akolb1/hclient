@@ -262,14 +262,14 @@ final class HMSClient implements AutoCloseable {
   }
 
   Partition createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
-    return client.add_partition(new Util.PartitionBuilder(table).setValues(values).build());
+    return client.add_partition(new Util.PartitionBuilder(table).withValues(values).build());
   }
 
   Partition addPartition(@NotNull Partition partition) throws TException {
     return client.add_partition(partition);
   }
 
-  void createPartitions(List<Partition> partitions) throws TException {
+  void addPartitions(List<Partition> partitions) throws TException {
     client.add_partitions(partitions);
   }
 

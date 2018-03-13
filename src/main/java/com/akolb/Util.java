@@ -246,12 +246,7 @@ final class Util {
       this.table = table;
     }
 
-    PartitionBuilder setValues(List<String> values) {
-      this.values = values;
-      return this;
-    }
-
-    PartitionBuilder copyValues(List<String> values) {
+    PartitionBuilder withValues(List<String> values) {
       this.values = new ArrayList<>(values);
       return this;
     }
@@ -377,22 +372,31 @@ final class Util {
     return new FieldSchema(name, colType, "");
   }
 
+  static List<Partition> createManyPartitions(@NotNull Table table,
+                                              @NotNull List<String> arguments,
+                                              int npartitions) {
+    return IntStream.range(0, npartitions)
+        .mapToObj(i ->
+            new PartitionBuilder(table)
+                .withValues(
+                    arguments.stream()
+                        .map(a -> a + i)
+                        .collect(Collectors.toList())).build())
+        .collect(Collectors.toList());
+  }
+
   static Object addManyPartitions(@NotNull HMSClient client,
-                                @NotNull String dbName,
-                                @NotNull String tableName,
-                                List<String> arguments,
-                                int npartitions) throws TException {
+                                  @NotNull String dbName,
+                                  @NotNull String tableName,
+                                  @NotNull List<String> arguments,
+                                  int npartitions) throws TException {
     Table table = client.getTable(dbName, tableName);
-    client.createPartitions(
-        IntStream.range(0, npartitions)
-            .mapToObj(i ->
-                new PartitionBuilder(table)
-                    .setValues(
-                        arguments.stream()
-                            .map(a -> a + i)
-                            .collect(Collectors.toList())).build())
-            .collect(Collectors.toList()));
+    client.addPartitions(createManyPartitions(table, arguments, npartitions));
     return null;
+  }
+
+  static List<String> generatePartitionNames(@NotNull String prefix, int npartitions) {
+    return IntStream.range(0, npartitions).mapToObj(i -> prefix+i).collect(Collectors.toList());
   }
 
   static void addManyPartitionsNoException(@NotNull HMSClient client,
