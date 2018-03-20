@@ -372,6 +372,14 @@ final class Util {
     return new FieldSchema(name, colType, "");
   }
 
+  /**
+   * Create multiple partition objects.
+   *
+   * @param table
+   * @param arguments - list of partition names.
+   * @param npartitions
+   * @return
+   */
   static List<Partition> createManyPartitions(@NotNull Table table,
                                               @NotNull List<String> arguments,
                                               int npartitions) {
