@@ -34,7 +34,8 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
+
+import static com.akolb.Util.filterMatches;
 
 /**
  * Group of benchmarks that can be joined together.
@@ -78,23 +79,17 @@ public final class BenchmarkSuite {
   }
 
   public List<String> list(@Nullable List<String> patterns) {
-    if (patterns == null || patterns.isEmpty()) {
-      return benchmarks;
-    }
-    return benchmarks
-        .stream()
-        .filter(s -> matches(s, patterns))
-        .collect(Collectors.toList());
+    return filterMatches(benchmarks, patterns);
   }
 
-  private BenchmarkSuite runAll() {
+  private BenchmarkSuite runAll(List<String> names) {
     if (doSanitize) {
-      benchmarks.forEach(name -> {
+      names.forEach(name -> {
         LOG.info("Running benchmark {}", name);
         result.put(name, sanitize(suite.get(name).get()));
       });
     } else {
-      benchmarks.forEach(name -> {
+      names.forEach(name -> {
         LOG.info("Running benchmark {}", name);
         result.put(name, suite.get(name).get());
       });
@@ -103,37 +98,13 @@ public final class BenchmarkSuite {
   }
 
   public BenchmarkSuite runMatching(@Nullable List<String> patterns) {
-    if (patterns == null || patterns.isEmpty()) {
-      return runAll();
-    }
-    if (doSanitize) {
-      benchmarks
-          .stream()
-          .filter(s -> matches(s, patterns))
-          .forEach(k -> {
-            LOG.info("Running benchmark {}", k);
-            result.put(k, sanitize(suite.get(k).get()));
-          });
-    } else {
-      benchmarks
-          .stream()
-          .filter(s -> matches(s, patterns))
-          .forEach(k -> {
-            LOG.info("Running benchmark {}", k);
-            result.put(k, suite.get(k).get());
-          });
-    }
-    return this;
+    return runAll(filterMatches(benchmarks, patterns));
   }
 
   public BenchmarkSuite add(@NotNull String name, @NotNull Supplier<DescriptiveStatistics> b) {
     suite.put(name, b);
     benchmarks.add(name);
     return this;
-  }
-
-  private static boolean matches(@NotNull String what, @NotNull List<String> patterns) {
-    return patterns.stream().anyMatch(what::matches);
   }
 
   /**

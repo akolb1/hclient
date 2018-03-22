@@ -43,6 +43,8 @@ import java.util.Formatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.akolb.HMSBenchmarks.benchmarkConcurrentPartitionOps;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
@@ -147,10 +149,16 @@ final class HMSBenchmark {
 
     LOG.info("Using table '{}.{}", dbName, tableName);
 
+    List<String> arguments = cmd.getArgList();
+
     boolean filtertests = cmd.hasOption(OPT_PATTERN);
     List<String> patterns = filtertests ?
         Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
         Collections.emptyList();
+    // If we have arguments, they are filters on the tests, so add them.
+    if (!arguments.isEmpty()) {
+      patterns = Stream.concat(patterns.stream(), arguments.stream()).collect(Collectors.toList());
+    }
 
     try (HMSClient client =
              new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),

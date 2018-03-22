@@ -63,6 +63,8 @@ final class Util {
 
   private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
+  private Util() {}
+
   /**
    * A builder for Database.  The name of the new database is required.  Everything else
    * selects reasonable defaults.
@@ -415,4 +417,44 @@ final class Util {
     throwingSupplierWrapper(() ->
         addManyPartitions(client, dbName, tableName, arguments, npartitions));
   }
+
+  static List<String> filterMatches(@Nullable List<String> candidates,
+                                    @Nullable List<String> patterns) {
+    if (candidates == null || candidates.isEmpty()) {
+      return Collections.emptyList();
+    }
+    if (patterns == null || patterns.isEmpty()) {
+      return candidates;
+    }
+
+    List<String>positive = positivePatterns(patterns);
+    List<String>negative = negativePatterns(patterns);
+
+    return candidates.stream()
+        .filter(c -> positive.isEmpty() || positive.stream().anyMatch(c::matches))
+        .filter(c -> negative.isEmpty() || !negative.stream().anyMatch(c::matches))
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Return list of positive patterns (not starting with bang)
+   * @param patterns
+   * @return
+   */
+  private static List<String> positivePatterns(@NotNull List<String> patterns) {
+    return patterns.stream().filter(p -> !p.startsWith("!")).collect(Collectors.toList());
+  }
+
+  /**
+   * Return list of negative patterns (starting with bang
+   * @param patterns
+   * @return
+   */
+  private static List<String> negativePatterns(@NotNull List<String> patterns) {
+    return patterns.stream()
+        .filter(p -> p.startsWith("!"))
+        .map(p -> p.substring(1))
+        .collect(Collectors.toList());
+  }
+
 }
