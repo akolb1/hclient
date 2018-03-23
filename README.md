@@ -1,5 +1,19 @@
 Simple CLI client for HMS Metastore.
 
+# Installation
+
+    mvn clean install -DskipTests
+
+You can run tests as well. Just set `HMS_HOST` environment variable to some HMS instance which is
+capable of running your requests (non-kerberised one) and run
+
+    mvn install
+    
+target directory has two mega-jars whioh have all the dependencies.
+
+Alternatively you can use `bin/hbench` and `bin/hclient` scripts which use Maven to run the code.
+
+
 # Hclient Usage
 
     usage: hclient list|create|addpart <options> [name:type...]
