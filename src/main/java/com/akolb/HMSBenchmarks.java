@@ -87,6 +87,21 @@ final class HMSBenchmarks {
         null);
   }
 
+  static DescriptiveStatistics benchmarkDeleteWithPartitions(MicroBenchmark bench,
+                                                             final HMSClient client,
+                                                             final String dbName,
+                                                             final String tableName,
+                                                             int howMany) {
+    return bench.measure(
+        () -> throwingSupplierWrapper(() -> {
+          createPartitionedTable(client, dbName, tableName);
+          addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
+          return true;
+        }),
+        () -> throwingSupplierWrapper(() -> client.dropTable(dbName, tableName)),
+        null);
+  }
+
   static DescriptiveStatistics benchmarkNetworkLatency(MicroBenchmark bench,
                                                        final String server, int port) {
     return bench.measure(

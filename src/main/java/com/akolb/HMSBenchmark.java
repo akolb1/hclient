@@ -50,6 +50,7 @@ import static com.akolb.HMSBenchmarks.benchmarkConcurrentPartitionOps;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartition;
 import static com.akolb.HMSBenchmarks.benchmarkCreatePartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDeleteCreate;
+import static com.akolb.HMSBenchmarks.benchmarkDeleteWithPartitions;
 import static com.akolb.HMSBenchmarks.benchmarkDropDatabase;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartition;
 import static com.akolb.HMSBenchmarks.benchmarkDropPartitions;
@@ -200,6 +201,10 @@ final class HMSBenchmark {
           .add("getTable", () -> benchmarkGetTable(bench, client, db, tbl))
           .add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl))
           .add("dropTable", () -> benchmarkDeleteCreate(bench, client, db, tbl))
+          .add("dropTableWithPartitions",
+              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, 1))
+          .add("dropTableWithPartitions" + '.' + instances,
+              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, instances))
           .add("addPartition", () -> benchmarkCreatePartition(bench, client, db, tbl))
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
