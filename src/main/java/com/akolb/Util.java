@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.akolb.HMSClient.throwingSupplierWrapper;
+import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
 final class Util {
@@ -96,12 +97,12 @@ final class Util {
       return this;
     }
 
-    public DatabaseBuilder withParams(Map<String, String> params) {
+    public DatabaseBuilder withParameters(Map<String, String> params) {
       this.params = params;
       return this;
     }
 
-    public DatabaseBuilder withParam(String key, String val) {
+    public DatabaseBuilder withParameter(String key, String val) {
       if (this.params == null) {
         this.params = new HashMap<>();
       }
@@ -154,51 +155,58 @@ final class Util {
       this.tableName = tableName;
     }
 
-    static Table buildDefaultTable(String dbName, String tableName) {
+    static Table buildDefaultTable(@NotNull String dbName, @NotNull String tableName) {
       return new TableBuilder(dbName, tableName).build();
     }
 
     TableBuilder withType(TableType tabeType) {
       this.tableType = tabeType;
+      if (tabeType == EXTERNAL_TABLE) {
+        // HMS ignores table type and requires EXTERNAL parameter to be set to true
+        this.withParameter("EXTERNAL", "true");
+      }
       return this;
     }
 
-    TableBuilder withOwner(String owner) {
+    TableBuilder withOwner(@NotNull String owner) {
       this.owner = owner;
       return this;
     }
 
-    TableBuilder withColumns(List<FieldSchema> columns) {
+    TableBuilder withColumns(@NotNull List<FieldSchema> columns) {
       this.columns = columns;
       return this;
     }
 
-    TableBuilder withPartitionKeys(List<FieldSchema> partitionKeys) {
+    TableBuilder withPartitionKeys(@NotNull List<FieldSchema> partitionKeys) {
       this.partitionKeys = partitionKeys;
       return this;
     }
 
-    TableBuilder withSerde(String serde) {
+    TableBuilder withSerde(@NotNull String serde) {
       this.serde = serde;
       return this;
     }
 
-    TableBuilder withInputFormat(String inputFormat) {
+    TableBuilder withInputFormat(@NotNull String inputFormat) {
       this.inputFormat = inputFormat;
       return this;
     }
 
-    TableBuilder withOutputFormat(String outputFormat) {
+    TableBuilder withOutputFormat(@NotNull String outputFormat) {
       this.outputFormat = outputFormat;
       return this;
     }
 
-    TableBuilder withParameter(String name, String value) {
+    TableBuilder withParameter(@NotNull String name, @NotNull String value) {
+      if (parameters == null) {
+        parameters = new HashMap<>();
+      }
       parameters.put(name, value);
       return this;
     }
 
-    TableBuilder withLocation(String location) {
+    TableBuilder withLocation(@NotNull String location) {
       this.location = location;
       return this;
     }
@@ -244,28 +252,35 @@ final class Util {
       table = null;
     }
 
-    PartitionBuilder(Table table) {
+    PartitionBuilder(@NotNull Table table) {
       this.table = table;
     }
 
-    PartitionBuilder withValues(List<String> values) {
+    PartitionBuilder withValues(@NotNull List<String> values) {
       this.values = new ArrayList<>(values);
       return this;
     }
 
-    PartitionBuilder withLocation(String location) {
+    PartitionBuilder withLocation(@NotNull String location) {
       this.location = location;
       return this;
     }
 
-    PartitionBuilder withParameter(String name, String value) {
+    PartitionBuilder withParameter(@NotNull String name, @NotNull String value) {
+      if (parameters == null) {
+        parameters = new HashMap<>();
+      }
       parameters.put(name, value);
       return this;
     }
 
     Partition build() {
+      if (table == null) {
+        return null;
+      }
       Partition partition = new Partition();
-      List<String> partitionNames = table.getPartitionKeys()
+      List<String> partitionNames = table.getPartitionKeys() == null ? Collections.emptyList() :
+          table.getPartitionKeys()
           .stream()
           .map(FieldSchema::getName)
           .collect(Collectors.toList());

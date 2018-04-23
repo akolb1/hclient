@@ -46,7 +46,7 @@ class HMSClientTest {
         new HMSClient(getServerUri(null, null), null);
     Database db = new Util.DatabaseBuilder(TEST_DATABASE)
         .withDescription(TEST_DATABASE_DESCRIPTION)
-        .withParams(TEST_DATABASE_PARAMS)
+        .withParameters(TEST_DATABASE_PARAMS)
         .build();
     client.createDatabase(db);
   }
