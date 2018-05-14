@@ -33,7 +33,9 @@ Alternatively you can use `bin/hbench` and `bin/hclient` scripts which use Maven
 
 # Examples
 
-    $ export HMS_=HOST=host.domain.com
+You can either specify the host with -H option or set it for a session with
+
+    $ export HMS_HOST=host.domain.com
     
 ## List all databases and tables
 
