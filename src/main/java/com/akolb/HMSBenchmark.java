@@ -76,12 +76,6 @@ import static com.akolb.HMSTool.OPT_PATTERN;
 import static com.akolb.HMSTool.OPT_VERBOSE;
 import static com.akolb.Util.getServerUri;
 
-/*
- * TODO Also show results on stdout when saved to file
- * TODO Integrate metrics
- * TODO Wrap DescriptiveStatistics into a timer class with start/stop methods
- */
-
 final class HMSBenchmark {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
   private static final TimeUnit scale = TimeUnit.MILLISECONDS;

@@ -8,6 +8,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.junit.Before;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.equalToIgnoringCase;
 import static org.hamcrest.Matchers.hasItem;
+import static org.junit.Assume.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class HMSClientTest {
@@ -32,29 +34,42 @@ class HMSClientTest {
       new ImmutableMap.Builder<String, String>()
       .put(PARAM_NAME, VALUE_NAME)
       .build();
+  private static boolean hasClient = false;
 
   private static final String TEST_TABLE_NAME="test1";
   private static final Table TEST_TABLE =
       Util.TableBuilder.buildDefaultTable(TEST_DATABASE, TEST_TABLE_NAME);
 
-  private static HMSClient client;
+  private static HMSClient client = null;
 
   @BeforeAll
   static void init() throws Exception {
-    // Create client and default test database
-    client =
-        new HMSClient(getServerUri(null, null), null);
     Database db = new Util.DatabaseBuilder(TEST_DATABASE)
         .withDescription(TEST_DATABASE_DESCRIPTION)
         .withParams(TEST_DATABASE_PARAMS)
         .build();
-    client.createDatabase(db);
+    // Create client and default test database
+    try {
+      client =
+          new HMSClient(getServerUri(null, null), null);
+          client.createDatabase(db);
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
+      e.printStackTrace();
+    }
   }
 
   @AfterAll
   static void shutdown() throws TException {
-    // Destroy test database
-    client.dropDatabase(TEST_DATABASE);
+    if (client != null) {
+      // Destroy test database
+      client.dropDatabase(TEST_DATABASE);
+    }
+  }
+
+  @Before
+  public void beforeTest() {
+    assumeTrue(client != null);
   }
 
   /**
@@ -65,7 +80,6 @@ class HMSClientTest {
   void getAllDatabases() throws Exception {
     Set<String> databases = client.getAllDatabases(null);
     assertThat(databases, hasItem("default"));
-    System.out.println(databases);
     assertThat(databases, hasItem(TEST_DATABASE.toLowerCase()));
     assertThat(client.getAllDatabases(TEST_DATABASE.toLowerCase()), contains(TEST_DATABASE.toLowerCase()));
   }
@@ -98,6 +112,7 @@ class HMSClientTest {
    */
   @Test
   void createDatabaseEmptyName() {
+    assumeTrue(client != null);
     Database db = new Util.DatabaseBuilder(TEST_DATABASE)
         .build();
     db.setName("");
@@ -156,6 +171,9 @@ class HMSClientTest {
     try {
       client.createTable(TEST_TABLE);
       assertThat(client.getAllTables(TEST_DATABASE, null), contains(TEST_TABLE_NAME));
+    } catch (Exception e) {
+      System.out.println(e.getMessage());
+      e.printStackTrace();
     } finally {
       client.dropTable(TEST_DATABASE, TEST_TABLE_NAME);
     }
