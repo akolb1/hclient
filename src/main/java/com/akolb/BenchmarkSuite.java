@@ -39,22 +39,47 @@ import static com.akolb.Util.filterMatches;
 
 /**
  * Group of benchmarks that can be joined together.
- * Every benchmark has an associated name.
- * Caller can either run all benchmarks or only ones matching the filter.
+ * Every benchmark has an associated name and code to run it.
+ * It is possible to run all benchmarks or only ones matching the filter.<p>
+ *
+ * Results can be optionally sanitized - any result that is outside of
+ * mean +/- margin * delta is removed from the result set. This helps remove random
+ * outliers.
+ *
+ * <h1>Example</h1>
+ *
+ * <pre>
+ *   StringBuilder sb = new StringBuilder();
+ *   Formatter fmt = new Formatter(sb);
+ *   BenchmarkSuite suite = new BenchmarkSuite();
+ *      // Arrange various benchmarks in a suite
+ *      BenchmarkSuite result = suite
+ *           .setScale(scale)
+ *           .doSanitize(true)
+ *           .add("someBenchmark", someBenchmarkFunc)
+ *           .add("anotherBenchmark", anotherBenchmarkFunc)
+ *           .runMatching(patterns);
+ *      result.display(fmt);
+ * </pre>
+ *
  */
 public final class BenchmarkSuite {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkSuite.class);
-  // Delta margin for data sanitizing
+  // Delta margin for data sanitizing. When sanitizing is enabled, we filter out
+  // all result which are outside
+  // mean +/- MARGIN * stddev
   private static final double MARGIN = 2;
   // Collection of benchmarks
   private final Map<String, Supplier<DescriptiveStatistics>> suite = new HashMap<>();
   // List of benchmarks. All benchmarks are executed in the order
   // they are inserted
   private final List<String> benchmarks = new ArrayList<>();
+  // Once benchmarks are executed, results are stored in TreeMap to prserve the order.
   private final Map<String, DescriptiveStatistics> result = new TreeMap<>();
+  // Whether sanitizing of results is requested
   private boolean doSanitize = false;
+  // Time units - we use milliseconds.
   private TimeUnit scale = TimeUnit.MILLISECONDS;
-  private double minMean = 0;
 
   /**
    * Set scaling factor for displaying results.
@@ -69,19 +94,40 @@ public final class BenchmarkSuite {
     return this;
   }
 
+  /**
+   * Enable or disable result sanitization.
+   * This can be done before or after benchmarks are executed.
+   * @param sanitize enable sanitization if true, disable if false
+   * @return this object, allowing chained calls.
+   */
   BenchmarkSuite doSanitize(boolean sanitize) {
     this.doSanitize = sanitize;
     return this;
   }
 
+  /**
+   * Get raw benchmark results
+   * @return map of benchmark name to the statistics describing the result
+   */
   public Map<String, DescriptiveStatistics> getResult() {
     return result;
   }
 
+  /**
+   * List matching benchmarks
+   * @param patterns list of benchmark names or their parts.
+   *                 Adding "!" in front of the name means "exclude".
+   * @return list of matching benchmark names.
+   */
   public List<String> list(@Nullable List<String> patterns) {
     return filterMatches(benchmarks, patterns);
   }
 
+  /**
+   * Run all benchmarks in the 'names' list
+   * @param names list of benchmarks to run
+   * @return this to allow chaining
+   */
   private BenchmarkSuite runAll(List<String> names) {
     if (doSanitize) {
       names.forEach(name -> {
@@ -127,25 +173,13 @@ public final class BenchmarkSuite {
     return new Median().evaluate(data.getValues());
   }
 
-  /**
-   * @return minimum of all mean values
-   */
-  private double minMean() {
-    double[] data = result.entrySet()
-        .stream()
-        .mapToDouble(e -> e.getValue().getMean())
-        .toArray();
-    return new DescriptiveStatistics(data).getMin();
-  }
-
   private void displayStats(Formatter fmt, String name, DescriptiveStatistics stats) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
 
-    fmt.format("%-30s %-8.4g %-8.4g %-8.4g %-8.4g %-8.4g %-8.4g%n",
+    fmt.format("%-30s %-8.4g %-8.4g %-8.4g %-8.4g %-8.4g%n",
         name,
-        (mean - minMean) / conv,
         mean / conv,
         median(stats) / conv,
         stats.getMin() / conv,
@@ -158,9 +192,8 @@ public final class BenchmarkSuite {
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
 
-    fmt.format("%s%s%g%s%g%s%g%s%g%s%g%s%g%n",
+    fmt.format("%s%s%g%s%g%s%g%s%g%s%g%n",
         name, separator,
-        (mean - minMean) / conv, separator,
         mean / conv, separator,
         median(stats) / conv, separator,
         stats.getMin() / conv, separator,
@@ -169,18 +202,16 @@ public final class BenchmarkSuite {
   }
 
   BenchmarkSuite display(Formatter fmt) {
-    fmt.format("%-30s %-8s %-8s %-8s %-8s %-8s %-8s%n",
-        "Operation", "AMean", "Mean", "Med", "Min", "Max", "Err%");
-    minMean = minMean();
+    fmt.format("%-30s %-8s %-8s %-8s %-8s %-8s%n",
+        "Operation", "Mean", "Med", "Min", "Max", "Err%");
     result.forEach((name, stat) -> displayStats(fmt, name, stat));
     return this;
   }
 
   BenchmarkSuite displayCSV(Formatter fmt, String separator) {
-    fmt.format("%s%s%s%s%6s%s%s%s%s%s%s%s%s%n",
-        "Operation", separator, "AMean", separator, "Mean", separator, "Med", separator, "Min",
+    fmt.format("%s%s%s%s%s%s%s%s%s%s%s%n",
+        "Operation", separator, "Mean", separator, "Med", separator, "Min",
         separator, "Max", separator, "Err%");
-    minMean = minMean();
     result.forEach((name, s) -> displayCSV(fmt, name, s, separator));
     return this;
   }
