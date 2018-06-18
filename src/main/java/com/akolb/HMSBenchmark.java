@@ -71,11 +71,14 @@ import static com.akolb.HMSTool.OPT_DATABASE;
 import static com.akolb.HMSTool.OPT_HOST;
 import static com.akolb.HMSTool.OPT_PORT;
 import static com.akolb.HMSTool.OPT_NUMBER;
-import static com.akolb.HMSTool.OPT_PARTITIONS;
 import static com.akolb.HMSTool.OPT_PATTERN;
 import static com.akolb.HMSTool.OPT_VERBOSE;
 import static com.akolb.Util.getServerUri;
 
+/**
+ * HMSBenchmark is a top-level application for measuring Hive Metastore
+ * performance.
+ */
 final class HMSBenchmark {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmark.class);
   private static final TimeUnit scale = TimeUnit.MILLISECONDS;
@@ -92,11 +95,14 @@ final class HMSBenchmark {
   private static final String OPT_SAVEDATA = "savedata";
   private static final String OPT_THREADS = "threads";
 
+  // There is no need to instantiate HMSBenchmark class.
+  private HMSBenchmark() {}
+
   public static void main(String[] args) throws Exception {
     Options options = new Options();
-    options.addOption("H", OPT_HOST, true, "HMS Server")
+    options.addOption("H", OPT_HOST, true,
+		      "HMS Server (can also be specified with HMS_HOST environment variable)")
         .addOption("P", OPT_PORT, true, "HMS Server port")
-        .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")

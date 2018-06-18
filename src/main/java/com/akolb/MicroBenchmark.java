@@ -30,11 +30,12 @@ import org.jetbrains.annotations.Nullable;
  *   <li>Mandatory test</lI>
  *   <li>Optional post-test</li>
  * </ul>
- * Measurement consists of the warm-up phase and measurement phase. Consumer can specify
- * number of times the warmup and measurement is repeated.<p>
+ * Measurement consists of the warm-up phase and measurement phase.
+ * Consumer can specify number of times the warmup and measurement is repeated.<p>
  * All time is measured in nanoseconds.
  */
 class MicroBenchmark {
+  // Specify defaults
   private static final int WARMUP_DEFAULT = 15;
   private static final int ITERATIONS_DEFAULT = 100;
   private static final int SCALE_DEFAULT = 1;
