@@ -96,7 +96,7 @@ public final class BenchmarkSuite {
 
   /**
    * Enable or disable result sanitization.
-   * This can be done before or after benchmarks are executed.
+   * This should be done before benchmarks are executed.
    * @param sanitize enable sanitization if true, disable if false
    * @return this object, allowing chained calls.
    */
@@ -124,7 +124,7 @@ public final class BenchmarkSuite {
   }
 
   /**
-   * Run all benchmarks in the 'names' list
+   * Run all benchmarks in the 'names' list.
    * @param names list of benchmarks to run
    * @return this to allow chaining
    */
@@ -143,10 +143,22 @@ public final class BenchmarkSuite {
     return this;
   }
 
+  /**
+   * Run all benchmarks whose name matches the list of patterns
+   * @param patterns list of string patterns.
+   *                 Patterns prefixed with '!' mean negative match.
+   * @return this.
+   */
   public BenchmarkSuite runMatching(@Nullable List<String> patterns) {
     return runAll(filterMatches(benchmarks, patterns));
   }
 
+  /**
+   * Add new benchmark to the suite.
+   * @param name benchmark name
+   * @param b benchmark corresponding to name
+   * @return this
+   */
   public BenchmarkSuite add(@NotNull String name, @NotNull Supplier<DescriptiveStatistics> b) {
     suite.put(name, b);
     benchmarks.add(name);
@@ -159,7 +171,7 @@ public final class BenchmarkSuite {
    * @param data Source data
    * @return new {@link @DescriptiveStatistics objects with sanitized data}
    */
-  private static DescriptiveStatistics sanitize(DescriptiveStatistics data) {
+  private static DescriptiveStatistics sanitize(@NotNull DescriptiveStatistics data) {
     double meanValue = data.getMean();
     double delta = MARGIN * meanValue;
     double minVal = meanValue - delta;
@@ -169,11 +181,23 @@ public final class BenchmarkSuite {
         .toArray());
   }
 
-  private static double median(DescriptiveStatistics data) {
+  /**
+   * Get median value for given statistics.
+   * @param data collected datapoints.
+   * @return median value.
+   */
+  private static double median(@NotNull DescriptiveStatistics data) {
     return new Median().evaluate(data.getValues());
   }
 
-  private void displayStats(Formatter fmt, String name, DescriptiveStatistics stats) {
+  /**
+   * Produce printable result
+   * @param fmt text formatter - destination of formatted results.
+   * @param name benchmark name
+   * @param stats benchmark data
+   */
+  private void displayStats(@NotNull Formatter fmt, @NotNull String name,
+                            @NotNull DescriptiveStatistics stats) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
@@ -187,7 +211,15 @@ public final class BenchmarkSuite {
         err);
   }
 
-  private void displayCSV(Formatter fmt, String name, DescriptiveStatistics stats, String separator) {
+  /**
+   * Produce results in printable CSV format, separated by separator.
+   * @param fmt text formatter - destination of formatted results.
+   * @param name benchmark name
+   * @param stats benchmark data
+   * @param separator field separator
+   */
+  private void displayCSV(@NotNull Formatter fmt, @NotNull String name,
+                          @NotNull DescriptiveStatistics stats, @NotNull String separator) {
     double mean = stats.getMean();
     double err = stats.getStandardDeviation() / mean * 100;
     long conv = scale.toNanos(1);
@@ -201,6 +233,11 @@ public final class BenchmarkSuite {
         err);
   }
 
+  /**
+   * Format all results
+   * @param fmt text formatter - destination of formatted results.
+   * @return this
+   */
   BenchmarkSuite display(Formatter fmt) {
     fmt.format("%-30s %-8s %-8s %-8s %-8s %-8s%n",
         "Operation", "Mean", "Med", "Min", "Max", "Err%");
@@ -208,6 +245,12 @@ public final class BenchmarkSuite {
     return this;
   }
 
+  /**
+   * Format all results in CSV format
+   * @param fmt text formatter - destination of formatted results.
+   * @param separator field separator
+   * @return this
+   */
   BenchmarkSuite displayCSV(Formatter fmt, String separator) {
     fmt.format("%s%s%s%s%s%s%s%s%s%s%s%n",
         "Operation", separator, "Mean", separator, "Med", separator, "Min",

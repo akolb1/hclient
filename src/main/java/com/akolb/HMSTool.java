@@ -67,10 +67,8 @@ final class HMSTool {
   static final String OPT_DROP = "drop";
   static final String OPT_VERBOSE = "verbose";
   static final String OPT_NUMBER = "number";
-  static final String OPT_PRELOAD_RATIO = "preloadRatio";
   static final String OPT_PATTERN = "pattern";
   static final String OPT_CONF = "conf";
-  static final String OPT_CLIENTS = "numClients";
   private static final String OPT_SHOW_PARTS = "showparts";
 
   private static final String DEFAULT_PATTERN = "%s_%d";
@@ -82,7 +80,6 @@ final class HMSTool {
   private static final String CMD_LIST_NID = "currnid";
   private static final String CMD_RENAME = "rename";
   private static final String CMD_DROPDB = "dropdb";
-  private static final String CMD_LOAD_TABLE = "load";
 
 
   public static void main(String[] args) throws Exception {
@@ -91,14 +88,12 @@ final class HMSTool {
         .addOption("P", OPT_PORT, true, "HMS Server port")
         .addOption("p", OPT_PARTITIONS, true, "partitions list")
         .addOption("c", OPT_COLUMNS, true, "column schema")
-        .addOption("nC", OPT_CLIENTS, true, "Number of clients to perform concurrent worklaods")
         .addOption("h", "help", false, "print this info")
         .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
         .addOption("t", OPT_TABLE, true, "table name (can be regexp for list)")
         .addOption("v", OPT_VERBOSE, false, "verbose mode")
         .addOption("N", OPT_NUMBER, true, "number of instances")
         .addOption("S", OPT_PATTERN, true, "table name pattern for bulk creation")
-        .addOption("pR", OPT_PRELOAD_RATIO, true, "Number of partitions to be preloaded")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SHOW_PARTS, false, "show partitions"))
         .addOption("D", OPT_DROP, false, "drop table if exists");
@@ -152,9 +147,6 @@ final class HMSTool {
         case CMD_DROPDB:
           cmdDropDatabase(client, cmd);
           break;
-      case CMD_LOAD_TABLE:
-        cmdLoadTable(cmd, arguments);
-        break;
         default:
           LOG.warn("Unknown command '" + command + "'");
           System.exit(1);
@@ -300,86 +292,6 @@ final class HMSTool {
     } else {
       addPartition(client, dbName, tableName, arguments);
     }
-  }
-
-  private static void preLoadOperations(HMSClient client, CommandLine cmd, String dbName,
-      String tableName, int preLoadedPartitions, List<String> partitionInfo,
-      List<String> columnsInfo) throws Exception {
-
-    dropTableIfExists(client, cmd, dbName, tableName);
-    System.out.println("Creating table " + dbName + ":" + tableName);
-    client.createTable(
-        new Util.TableBuilder(dbName, tableName).withColumns(createSchema(columnsInfo))
-            .withPartitionKeys(createSchema(partitionInfo)).build());
-    Table table = client.getTable(dbName, tableName);
-    //one alter partition event for each getPartition event during MoveTask
-    List<String> values = new ArrayList<>(1);
-    System.out.println(String
-        .format("Preloading table %s : %s with %d partitions", dbName, tableName,
-            preLoadedPartitions));
-    for (int i = 0; i < preLoadedPartitions; i++) {
-      values.add(String.valueOf(i));
-      Partition partition = new PartitionBuilder(table).withValues(values).build();
-      //simulates existing partitions of the table
-      client.appendPartition(dbName, tableName, values);
-      values.clear();
-    }
-  }
-
-  private static void cmdLoadTable(CommandLine cmd, List<String> arguments) throws Exception {
-    String dbName = cmd.getOptionValue(OPT_DATABASE);
-    String tableName = cmd.getOptionValue(OPT_TABLE);
-
-    if (tableName != null && tableName.contains(".")) {
-      String[] parts = tableName.split("\\.");
-      dbName = parts[0];
-      tableName = parts[1];
-    }
-    int totalPartitions = 100;
-    if (cmd.hasOption(OPT_NUMBER)) {
-      totalPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
-    }
-
-    double preLoadRatio = 0.5D;
-    if (cmd.hasOption(OPT_PRELOAD_RATIO)) {
-      preLoadRatio = Double.parseDouble(cmd.getOptionValue(OPT_PRELOAD_RATIO));
-    }
-    assert (preLoadRatio > 0 && preLoadRatio < 1.0);
-    int preLoadedPartitions = (int) (preLoadRatio * totalPartitions);
-    List<String> columnsInfo;
-    if (cmd.hasOption(OPT_COLUMNS)) {
-      String columns = cmd.getOptionValue(OPT_COLUMNS);
-      String[] partitions = columns == null ? null : columns.split(",");
-      columnsInfo =
-          partitions == null ? Collections.emptyList() : new ArrayList<>(Arrays.asList(partitions));
-    } else {
-      LOG.error("Columns options is needed");
-      return;
-    }
-
-    List<String> partitionInfo;
-    if (cmd.hasOption(OPT_PARTITIONS)) {
-      String partitionsInfo = cmd.getOptionValue(OPT_PARTITIONS);
-      String[] partitions = partitionsInfo == null ? null : partitionsInfo.split(",");
-      partitionInfo =
-          partitions == null ? Collections.emptyList() : new ArrayList<>(Arrays.asList(partitions));
-    } else {
-      LOG.error("Partitions info is needed");
-      return;
-    }
-
-    int numClients = Integer.parseInt(cmd.getOptionValue(OPT_CLIENTS, "5"));
-    //preloading step doesn't need to multi-threaded
-    try (HMSClient client = new HMSClient(
-        getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
-        cmd.getOptionValue(OPT_CONF))) {
-      for (int i=1; i<=numClients; i++) {
-        preLoadOperations(client, cmd, dbName, getPrefixedTableName(i, tableName), preLoadedPartitions, partitionInfo,
-            columnsInfo);
-      }
-    }
-    //now simulate multiple insert overwrite metadata operations
-    loadTableInParallel(cmd, totalPartitions, dbName, tableName, numClients, preLoadedPartitions);
   }
 
   private static String getPrefixedTableName(int i, String tableName) {
