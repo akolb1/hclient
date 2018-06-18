@@ -50,6 +50,10 @@ import java.util.stream.IntStream;
 import static com.akolb.HMSClient.throwingSupplierWrapper;
 import static org.apache.hadoop.hive.metastore.TableType.MANAGED_TABLE;
 
+/**
+ * Helper utilities. The Util class is just a placeholder for static methods,
+ * it should be never instantiated.
+ */
 final class Util {
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
@@ -63,6 +67,7 @@ final class Util {
 
   private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
+  // Disable public constructor
   private Util() {}
 
   /**
@@ -78,30 +83,56 @@ final class Util {
     private PrincipalType ownerType;
     private Map<String, String> params = null;
 
+    // Disable default constructor
     private DatabaseBuilder() {
     }
 
-    public DatabaseBuilder(String name) {
+    /**
+     * Constructor from database name.
+     * @param name Database name
+     */
+    public DatabaseBuilder(@NotNull String name) {
       this.name = name;
       ownerType = PrincipalType.USER;
     }
 
-    public DatabaseBuilder withDescription(String description) {
+    /**
+     * Add database description.
+     * @param description Database description string.
+     * @return this
+     */
+    public DatabaseBuilder withDescription(@NotNull String description) {
       this.description = description;
       return this;
     }
 
-    public DatabaseBuilder withLocation(String location) {
+    /**
+     * Add database location
+     * @param location Database location string
+     * @return this
+     */
+    public DatabaseBuilder withLocation(@NotNull String location) {
       this.location = location;
       return this;
     }
 
-    public DatabaseBuilder withParams(Map<String, String> params) {
+    /**
+     * Add Database parameters
+     * @param params database parameters
+     * @return this
+     */
+    public DatabaseBuilder withParams(@NotNull Map<String, String> params) {
       this.params = params;
       return this;
     }
 
-    public DatabaseBuilder withParam(String key, String val) {
+    /**
+     * Add a single database parameter.
+     * @param key parameter key
+     * @param val parameter value
+     * @return this
+     */
+    public DatabaseBuilder withParam(@NotNull String key, @NotNull String val) {
       if (this.params == null) {
         this.params = new HashMap<>();
       }
@@ -109,16 +140,30 @@ final class Util {
       return this;
     }
 
-    public DatabaseBuilder withOwnerName(String ownerName) {
+    /**
+     * Add database owner name
+     * @param ownerName new owner name
+     * @return this
+     */
+    public DatabaseBuilder withOwnerName(@NotNull String ownerName) {
       this.ownerName = ownerName;
       return this;
     }
 
+    /**
+     * Add owner tyoe
+     * @param ownerType database owner type (USER or GROUP)
+     * @return this
+     */
     public DatabaseBuilder withOwnerType(PrincipalType ownerType) {
       this.ownerType = ownerType;
       return this;
     }
 
+    /**
+     * Build database object
+     * @return database
+     */
     public Database build() {
       Database db = new Database(name, description, location, params);
       if (ownerName != null) {
@@ -441,7 +486,7 @@ final class Util {
    * @param patterns
    * @return
    */
-  private static List<String> positivePatterns(@NotNull List<String> patterns) {
+  private static List<String> positivePatterns(@NotNull List<@NotNull String> patterns) {
     return patterns.stream().filter(p -> !p.startsWith("!")).collect(Collectors.toList());
   }
 
@@ -450,7 +495,7 @@ final class Util {
    * @param patterns
    * @return
    */
-  private static List<String> negativePatterns(@NotNull List<String> patterns) {
+  private static List<String> negativePatterns(@NotNull List<@NotNull String> patterns) {
     return patterns.stream()
         .filter(p -> p.startsWith("!"))
         .map(p -> p.substring(1))
