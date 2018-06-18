@@ -27,9 +27,9 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
 import org.junit.Before;
+import org.junit.Test;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
@@ -43,7 +43,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assume.assumeTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class HMSClientTest {
+public class HMSClientTest {
   private static final String PARAM_NAME = "param";
   private static final String VALUE_NAME = "value";
   private static final String TEST_DATABASE="hmsClientTest";
@@ -95,7 +95,7 @@ class HMSClientTest {
    * @throws Exception
    */
   @Test
-  void getAllDatabases() throws Exception {
+  public void getAllDatabases() throws Exception {
     Set<String> databases = client.getAllDatabases(null);
     assertThat(databases, hasItem("default"));
     assertThat(databases, hasItem(TEST_DATABASE.toLowerCase()));
@@ -106,7 +106,7 @@ class HMSClientTest {
    * Verify that an attempt to create an existing database throws AlreadyExistsException.
    */
   @Test
-  void createExistingDatabase() {
+  public void createExistingDatabase() {
     Throwable exception = assertThrows(AlreadyExistsException.class,
         () -> client.createDatabase(TEST_DATABASE));
   }
@@ -116,7 +116,7 @@ class HMSClientTest {
    * and should throw MetaException.
    */
   @Test
-  void createDatabaseNullName() {
+  public void createDatabaseNullName() {
     Database db = new Util.DatabaseBuilder(TEST_DATABASE)
         .build();
     db.setName(null);
@@ -129,7 +129,7 @@ class HMSClientTest {
    * and should throw InvalidObjectException
    */
   @Test
-  void createDatabaseEmptyName() {
+  public void createDatabaseEmptyName() {
     assumeTrue(client != null);
     Database db = new Util.DatabaseBuilder(TEST_DATABASE)
         .build();
@@ -143,7 +143,7 @@ class HMSClientTest {
    * @throws TException if fails to get database info
    */
   @Test
-  void getDatabase() throws TException {
+  public void getDatabase() throws TException {
     Database db = client.getDatabase(TEST_DATABASE);
     assertThat(db.getName(), equalToIgnoringCase(TEST_DATABASE));
     assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
@@ -155,7 +155,7 @@ class HMSClientTest {
    * Verify that locating database is case-insensitive
    */
   @Test
-  void getDatabaseCI() throws TException {
+  public void getDatabaseCI() throws TException {
     Database db = client.getDatabase(TEST_DATABASE.toUpperCase());
     assertThat(db.getName(), equalToIgnoringCase(TEST_DATABASE));
     assertThat(db.getDescription(), equalTo(TEST_DATABASE_DESCRIPTION));
@@ -168,7 +168,7 @@ class HMSClientTest {
    * NoSuchObjectException
    */
   @Test
-  void getNonExistingDb() {
+  public void getNonExistingDb() {
     Throwable exception = assertThrows(NoSuchObjectException.class,
         () -> client.getDatabase("WhatIsThisDatabase"));
   }
@@ -179,13 +179,13 @@ class HMSClientTest {
    * NoSuchObjectException
    */
   @Test
-  void dropNonExistingDb() {
+  public void dropNonExistingDb() {
     Throwable exception = assertThrows(NoSuchObjectException.class,
         () -> client.dropDatabase("WhatIsThisDatabase"));
   }
 
   @Test
-  void getAllTables() throws TException {
+  public void getAllTables() throws TException {
     try {
       client.createTable(TEST_TABLE);
       assertThat(client.getAllTables(TEST_DATABASE, null), contains(TEST_TABLE_NAME));

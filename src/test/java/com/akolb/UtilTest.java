@@ -19,7 +19,7 @@
 package com.akolb;
 
 import com.google.common.collect.ImmutableList;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,14 +28,17 @@ import static com.akolb.Util.filterMatches;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 
-class UtilTest {
+public class UtilTest {
+
+  public UtilTest() {
+  }
 
   /**
    * Test that a null pattern returns all candidates for iflterMatches.
    * Also verify that null candidates result in an empty result list.
    */
   @Test
-  void filterMatchesEmpty() {
+  public void filterMatchesEmpty() {
     List<String> candidates = ImmutableList.of("a", "b");
     assertThat(filterMatches(candidates, null), is(candidates));
     assertThat(filterMatches(null, candidates), is(Collections.emptyList()));
@@ -45,7 +48,7 @@ class UtilTest {
    * Test positive matches when some candidates match.
    */
   @Test
-  void filterMatchesPositive() {
+  public void filterMatchesPositive() {
     List<String> candidates = ImmutableList.of("a", "b");
     List<String> expected = ImmutableList.of("a");
     List<String> filtered = filterMatches(candidates, Collections.singletonList("a"));
@@ -56,7 +59,7 @@ class UtilTest {
    * Test matches for negative notation (!something).
    */
   @Test
-  void filterMatchesNegative() {
+  public void filterMatchesNegative() {
     List<String> candidates = ImmutableList.of("a", "b");
     List<String> expected = ImmutableList.of("a");
     assertThat(filterMatches(candidates, Collections.singletonList("!b")), is(expected));
@@ -66,12 +69,10 @@ class UtilTest {
    * Test that multiple patterns are handled correctly. We use one positive and one negative parrent.
    */
   @Test
-  void filterMatchesMultiple() {
+  public void filterMatchesMultiple() {
     List<String> candidates = ImmutableList.of("a", "b", "any", "boom", "hello");
     List<String> patterns = ImmutableList.of("^a", "!y$");
     List<String> expected = ImmutableList.of("a");
     assertThat(filterMatches(candidates, patterns), is(expected));
   }
-
-
 }
