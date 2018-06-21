@@ -60,6 +60,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+/**
+ * Wrapper for Thrift HMS interface.
+ */
 final class HMSClient implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(HMSClient.class);
   private static final String METASTORE_URI = "hive.metastore.uris";
