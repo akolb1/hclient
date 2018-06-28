@@ -94,6 +94,7 @@ final class HMSBenchmark {
   private static final String OPT_CSV = "csv";
   private static final String OPT_SAVEDATA = "savedata";
   private static final String OPT_THREADS = "threads";
+  private static final String OPT_NPARAMS = "params";
 
   // There is no need to instantiate HMSBenchmark class.
   private HMSBenchmark() {}
@@ -116,6 +117,7 @@ final class HMSBenchmark {
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
         .addOption(new Option(OPT_SANITIZE, false, "sanitize results"))
         .addOption(new Option(OPT_CSV, false, "produce CSV output"))
+        .addOption(new Option(OPT_NPARAMS, true, "number of parameters"))
         .addOption(new Option(OPT_SAVEDATA, true,
             "save raw data in specified dir"))
         .addOption("S", OPT_PATTERN, true, "test patterns");
@@ -176,8 +178,9 @@ final class HMSBenchmark {
       int nThreads =  Integer.parseInt(cmd.getOptionValue(OPT_THREADS, "2"));
       int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
       int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
+      int nparams = Integer.parseInt(cmd.getOptionValue(OPT_NPARAMS, "1"));
       LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
-          " spin " + spin + " threads " + nThreads);
+          " spin " + spin + " nparams " + nparams + " threads " + nThreads);
 
       final String db = dbName;
       final String tbl = tableName;
@@ -202,9 +205,9 @@ final class HMSBenchmark {
           .add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl))
           .add("dropTable", () -> benchmarkDeleteCreate(bench, client, db, tbl))
           .add("dropTableWithPartitions",
-              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, 1))
+              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, 1, nparams))
           .add("dropTableWithPartitions" + '.' + instances,
-              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, instances))
+              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, instances, nparams))
           .add("addPartition", () -> benchmarkCreatePartition(bench, client, db, tbl))
           .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
           .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))

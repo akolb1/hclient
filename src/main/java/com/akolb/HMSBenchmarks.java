@@ -33,7 +33,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.IntStream;
@@ -50,6 +52,9 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
  */
 final class HMSBenchmarks {
   private static final Logger LOG = LoggerFactory.getLogger(HMSBenchmarks.class);
+
+  private static final String PARAM_KEY = "parameter_";
+  private static final String PARAM_VALUE = "value_";
 
   static DescriptiveStatistics benchmarkListDatabases(MicroBenchmark benchmark,
                                                       final HMSClient client) {
@@ -91,11 +96,19 @@ final class HMSBenchmarks {
                                                              final HMSClient client,
                                                              final String dbName,
                                                              final String tableName,
-                                                             int howMany) {
+                                                             int howMany,
+                                                             int nparams) {
+    // Create many parameters
+    Map<String, String> parameters = new HashMap<>(nparams);
+    for (int i = 0; i < nparams; i++) {
+      parameters.put(PARAM_KEY + i, PARAM_VALUE + i);
+    }
+
     return bench.measure(
         () -> throwingSupplierWrapper(() -> {
           createPartitionedTable(client, dbName, tableName);
-          addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
+          addManyPartitions(client, dbName, tableName, parameters,
+              Collections.singletonList("d"), howMany);
           return true;
         }),
         () -> throwingSupplierWrapper(() -> client.dropTable(dbName, tableName)),

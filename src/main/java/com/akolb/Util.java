@@ -308,6 +308,11 @@ final class Util {
       return this;
     }
 
+    PartitionBuilder withParameters(Map<String, String> params) {
+      parameters = params;
+      return this;
+    }
+
     Partition build() {
       Partition partition = new Partition();
       List<String> partitionNames = table.getPartitionKeys()
@@ -440,6 +445,29 @@ final class Util {
         .collect(Collectors.toList());
   }
 
+  /**
+   * Create multiple partition objects.
+   *
+   * @param table
+   * @param arguments - list of partition names.
+   * @param npartitions
+   * @return
+   */
+  static List<Partition> createManyPartitions(@NotNull Table table,
+                                              @NotNull Map<String, String> parameters,
+                                              @NotNull List<String> arguments,
+                                              int npartitions) {
+    return IntStream.range(0, npartitions)
+        .mapToObj(i ->
+            new PartitionBuilder(table)
+                .withParameters(parameters)
+                .withValues(
+                    arguments.stream()
+                        .map(a -> a + i)
+                        .collect(Collectors.toList())).build())
+        .collect(Collectors.toList());
+  }
+
   static Object addManyPartitions(@NotNull HMSClient client,
                                   @NotNull String dbName,
                                   @NotNull String tableName,
@@ -447,6 +475,17 @@ final class Util {
                                   int npartitions) throws TException {
     Table table = client.getTable(dbName, tableName);
     client.addPartitions(createManyPartitions(table, arguments, npartitions));
+    return null;
+  }
+
+  static Object addManyPartitions(@NotNull HMSClient client,
+                                  @NotNull String dbName,
+                                  @NotNull String tableName,
+                                  @NotNull Map<String, String> parameters,
+                                  @NotNull List<String> arguments,
+                                  int npartitions) throws TException {
+    Table table = client.getTable(dbName, tableName);
+    client.addPartitions(createManyPartitions(table, parameters, arguments, npartitions));
     return null;
   }
 
