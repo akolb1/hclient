@@ -153,6 +153,10 @@ public final class BenchmarkSuite {
     return runAll(filterMatches(benchmarks, patterns));
   }
 
+  public List<String> listMatching(@Nullable List<String> patterns) {
+    return filterMatches(benchmarks, patterns);
+  }
+
   /**
    * Add new benchmark to the suite.
    * @param name benchmark name

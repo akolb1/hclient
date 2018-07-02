@@ -111,7 +111,7 @@ final class HMSBenchmark {
         .addOption("K", OPT_SEPARATOR, true, "field separator")
         .addOption("L", OPT_SPIN, true, "spin count")
         .addOption("W", OPT_WARM, true, "warmup count")
-        .addOption("l", OPT_LIST, true, "list benchmarks")
+        .addOption("l", OPT_LIST, false, "list benchmarks")
         .addOption("o", OPT_OUTPUT, true, "output file")
         .addOption("T", OPT_THREADS, true, "numberOfThreads")
         .addOption(new Option(OPT_CONF, true, "configuration directory"))
@@ -138,6 +138,8 @@ final class HMSBenchmark {
       help(options);
     }
 
+    boolean doList = cmd.hasOption(OPT_LIST);
+
     PrintStream output = System.out;
     if (cmd.hasOption(OPT_OUTPUT)) {
       output = new PrintStream(cmd.getOptionValue(OPT_OUTPUT));
@@ -146,11 +148,9 @@ final class HMSBenchmark {
     String dbName = cmd.getOptionValue(OPT_DATABASE);
     String tableName = TEST_TABLE;
 
-    if (dbName == null || dbName.isEmpty()) {
+    if (!doList && (dbName == null || dbName.isEmpty())) {
       throw new RuntimeException("Missing DB name");
     }
-
-    LOG.info("Using table '{}.{}", dbName, tableName);
 
     List<String> arguments = cmd.getArgList();
 
@@ -163,9 +163,79 @@ final class HMSBenchmark {
       patterns = Stream.concat(patterns.stream(), arguments.stream()).collect(Collectors.toList());
     }
 
+    int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
+    int nThreads =  Integer.parseInt(cmd.getOptionValue(OPT_THREADS, "2"));
+    int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
+    int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
+    int nparams = Integer.parseInt(cmd.getOptionValue(OPT_NPARAMS, "1"));
+    LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
+        " spin " + spin + " nparams " + nparams + " threads " + nThreads);
+
+    StringBuilder sb = new StringBuilder();
+    Formatter fmt = new Formatter(sb);
+    BenchData bData = new BenchData(dbName, tableName);
+
+    MicroBenchmark bench = new MicroBenchmark(warmup, spin);
+    BenchmarkSuite suite = new BenchmarkSuite();
+
+    suite
+        .setScale(scale)
+        .doSanitize(cmd.hasOption(OPT_SANITIZE))
+        .add("getNid", () -> benchmarkGetNotificationId(bench, bData))
+        .add("listDatabases", () -> benchmarkListDatabases(bench, bData))
+        .add("listTables", () -> benchmarkListAllTables(bench, bData))
+        .add("listTables" + '.' + instances,
+            () -> benchmarkListTables(bench, bData, instances))
+        .add("getTable", () -> benchmarkGetTable(bench, bData))
+        .add("createTable", () -> benchmarkTableCreate(bench, bData))
+        .add("dropTable", () -> benchmarkDeleteCreate(bench, bData))
+        .add("dropTableWithPartitions",
+            () -> benchmarkDeleteWithPartitions(bench, bData, 1, nparams))
+        .add("dropTableWithPartitions" + '.' + instances,
+            () -> benchmarkDeleteWithPartitions(bench, bData, instances, nparams))
+        .add("addPartition", () -> benchmarkCreatePartition(bench, bData))
+        .add("dropPartition", () -> benchmarkDropPartition(bench, bData))
+        .add("listPartition", () -> benchmarkListPartition(bench, bData))
+        .add("listPartitions" + '.' + instances,
+            () -> benchmarkListManyPartitions(bench, bData,  instances))
+        .add("getPartition",
+            () -> benchmarkGetPartitions(bench, bData,  1))
+        .add("getPartitions" + '.' + instances,
+            () -> benchmarkGetPartitions(bench, bData,  instances))
+        .add("getPartitionNames",
+            () -> benchmarkGetPartitionNames(bench, bData,  1))
+        .add("getPartitionNames" + '.' + instances,
+            () -> benchmarkGetPartitionNames(bench, bData,  instances))
+        .add("getPartitionsByNames",
+            () -> benchmarkGetPartitionsByName(bench, bData,  1))
+        .add("getPartitionsByNames" + '.' + instances,
+            () -> benchmarkGetPartitionsByName(bench, bData,  instances))
+        .add("addPartitions" + '.' + instances,
+            () -> benchmarkCreatePartitions(bench, bData,  instances))
+        .add("dropPartitions" + '.' + instances,
+            () -> benchmarkDropPartitions(bench, bData,  instances))
+        .add("renameTable",
+            () -> benchmarkRenameTable(bench, bData,  1))
+        .add("renameTable" + '.' + instances,
+            () -> benchmarkRenameTable(bench, bData,  instances))
+        .add("dropDatabase",
+            () -> benchmarkDropDatabase(bench, bData, 1))
+        .add("dropDatabase" + '.' + instances,
+            () -> benchmarkDropDatabase(bench, bData, instances))
+        .add("concurrentPartitionAdd" + "#" + nThreads,
+            () -> benchmarkConcurrentPartitionOps(bench, bData,  instances, nThreads));
+
+    if (doList) {
+      suite.listMatching((patterns)).forEach(System.out::println);
+      return;
+    }
+
+    LOG.info("Using table '{}.{}", dbName, tableName);
+
     try (HMSClient client =
              new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
                  cmd.getOptionValue(OPT_CONF))) {
+      bData.setClient(client);
       if (!client.dbExists(dbName)) {
         client.createDatabase(dbName);
       }
@@ -174,72 +244,8 @@ final class HMSBenchmark {
         client.dropTable(dbName, tableName);
       }
 
-      int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
-      int nThreads =  Integer.parseInt(cmd.getOptionValue(OPT_THREADS, "2"));
-      int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
-      int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
-      int nparams = Integer.parseInt(cmd.getOptionValue(OPT_NPARAMS, "1"));
-      LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
-          " spin " + spin + " nparams " + nparams + " threads " + nThreads);
-
-      final String db = dbName;
-      final String tbl = tableName;
-
-      LOG.info("Using {} object instances", instances);
-      StringBuilder sb = new StringBuilder();
-      Formatter fmt = new Formatter(sb);
-
-      MicroBenchmark bench = new MicroBenchmark(warmup, spin);
-      BenchmarkSuite suite = new BenchmarkSuite();
-
       // Arrange various benchmarks in a suite
-      BenchmarkSuite result = suite
-          .setScale(scale)
-          .doSanitize(cmd.hasOption(OPT_SANITIZE))
-          .add("getNid", () -> benchmarkGetNotificationId(bench, client))
-          .add("listDatabases", () -> benchmarkListDatabases(bench, client))
-          .add("listTables", () -> benchmarkListAllTables(bench, client, db))
-          .add("listTables" + '.' + instances,
-              () -> benchmarkListTables(bench, client, db, instances))
-          .add("getTable", () -> benchmarkGetTable(bench, client, db, tbl))
-          .add("createTable", () -> benchmarkTableCreate(bench, client, db, tbl))
-          .add("dropTable", () -> benchmarkDeleteCreate(bench, client, db, tbl))
-          .add("dropTableWithPartitions",
-              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, 1, nparams))
-          .add("dropTableWithPartitions" + '.' + instances,
-              () -> benchmarkDeleteWithPartitions(bench, client, db, tbl, instances, nparams))
-          .add("addPartition", () -> benchmarkCreatePartition(bench, client, db, tbl))
-          .add("dropPartition", () -> benchmarkDropPartition(bench, client, db, tbl))
-          .add("listPartition", () -> benchmarkListPartition(bench, client, db, tbl))
-          .add("listPartitions" + '.' + instances,
-              () -> benchmarkListManyPartitions(bench, client, db, tbl, instances))
-          .add("getPartition",
-              () -> benchmarkGetPartitions(bench, client, db, tbl, 1))
-          .add("getPartitions" + '.' + instances,
-              () -> benchmarkGetPartitions(bench, client, db, tbl, instances))
-          .add("getPartitionNames",
-              () -> benchmarkGetPartitionNames(bench, client, db, tbl, 1))
-          .add("getPartitionNames" + '.' + instances,
-              () -> benchmarkGetPartitionNames(bench, client, db, tbl, instances))
-          .add("getPartitionsByNames",
-              () -> benchmarkGetPartitionsByName(bench, client, db, tbl, 1))
-          .add("getPartitionsByNames" + '.' + instances,
-              () -> benchmarkGetPartitionsByName(bench, client, db, tbl, instances))
-          .add("addPartitions" + '.' + instances,
-              () -> benchmarkCreatePartitions(bench, client, db, tbl, instances))
-          .add("dropPartitions" + '.' + instances,
-              () -> benchmarkDropPartitions(bench, client, db, tbl, instances))
-          .add("renameTable",
-              () -> benchmarkRenameTable(bench, client, db, tbl, 1))
-          .add("renameTable" + '.' + instances,
-              () -> benchmarkRenameTable(bench, client, db, tbl, instances))
-          .add("dropDatabase",
-              () -> benchmarkDropDatabase(bench, client, db, 1))
-          .add("dropDatabase" + '.' + instances,
-              () -> benchmarkDropDatabase(bench, client, db, instances))
-          .add("concurrentPartitionAdd" + "#" + nThreads,
-              () -> benchmarkConcurrentPartitionOps(bench, client, db, tbl, instances, nThreads))
-          .runMatching(patterns);
+      BenchmarkSuite result = suite.runMatching(patterns);
 
       if (cmd.hasOption(OPT_CSV)) {
         result.displayCSV(fmt, CSV_SEPARATOR);
@@ -262,7 +268,6 @@ final class HMSBenchmark {
       if (cmd.hasOption(OPT_SAVEDATA)) {
         saveData(result.getResult(), cmd.getOptionValue(OPT_SAVEDATA), scale);
       }
-
     }
   }
 
@@ -295,7 +300,7 @@ final class HMSBenchmark {
 
   private static void help(Options options) {
     HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("hbench ...", options);
+    formatter.printHelp("hbench [options] [name] ...", options);
     System.exit(0);
   }
 

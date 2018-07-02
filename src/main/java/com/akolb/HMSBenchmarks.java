@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.thrift.TException;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,23 +57,28 @@ final class HMSBenchmarks {
   private static final String PARAM_KEY = "parameter_";
   private static final String PARAM_VALUE = "value_";
 
-  static DescriptiveStatistics benchmarkListDatabases(MicroBenchmark benchmark,
-                                                      final HMSClient client) {
+  static DescriptiveStatistics benchmarkListDatabases(@NotNull MicroBenchmark benchmark,
+                                                      @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
     return benchmark.measure(() ->
         throwingSupplierWrapper(() -> client.getAllDatabases(null)));
   }
 
-  static DescriptiveStatistics benchmarkListAllTables(MicroBenchmark benchmark,
-                                                      final HMSClient client,
-                                                      final String dbName) {
+  static DescriptiveStatistics benchmarkListAllTables(@NotNull MicroBenchmark benchmark,
+                                                      @NotNull BenchData data) {
+
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+
     return benchmark.measure(() ->
         throwingSupplierWrapper(() -> client.getAllTables(dbName, null)));
   }
 
-  static DescriptiveStatistics benchmarkTableCreate(MicroBenchmark bench,
-                                                    final HMSClient client,
-                                                    final String dbName,
-                                                    final String tableName) {
+  static DescriptiveStatistics benchmarkTableCreate(@NotNull MicroBenchmark bench,
+                                                    @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
     Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(null,
@@ -80,10 +86,11 @@ final class HMSBenchmarks {
         () -> throwingSupplierWrapper(() -> client.dropTable(dbName, tableName)));
   }
 
-  static DescriptiveStatistics benchmarkDeleteCreate(MicroBenchmark bench,
-                                                     final HMSClient client,
-                                                     final String dbName,
-                                                     final String tableName) {
+  static DescriptiveStatistics benchmarkDeleteCreate(@NotNull MicroBenchmark bench,
+                                                     @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
     Table table = Util.TableBuilder.buildDefaultTable(dbName, tableName);
 
     return bench.measure(
@@ -92,12 +99,14 @@ final class HMSBenchmarks {
         null);
   }
 
-  static DescriptiveStatistics benchmarkDeleteWithPartitions(MicroBenchmark bench,
-                                                             final HMSClient client,
-                                                             final String dbName,
-                                                             final String tableName,
+  static DescriptiveStatistics benchmarkDeleteWithPartitions(@NotNull MicroBenchmark bench,
+                                                             @NotNull BenchData data,
                                                              int howMany,
                                                              int nparams) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     // Create many parameters
     Map<String, String> parameters = new HashMap<>(nparams);
     for (int i = 0; i < nparams; i++) {
@@ -115,23 +124,12 @@ final class HMSBenchmarks {
         null);
   }
 
-  static DescriptiveStatistics benchmarkNetworkLatency(MicroBenchmark bench,
-                                                       final String server, int port) {
-    return bench.measure(
-        () -> {
-          //noinspection EmptyTryBlock
-          try (Socket socket = new Socket(server, port)) {
-            ;
-          } catch (IOException e) {
-            LOG.error("socket connection failed", e);
-          }
-        });
-  }
+  static DescriptiveStatistics benchmarkGetTable(@NotNull MicroBenchmark bench,
+                                                 @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
 
-  static DescriptiveStatistics benchmarkGetTable(MicroBenchmark bench,
-                                                 final HMSClient client,
-                                                 final String dbName,
-                                                 final String tableName) {
     createPartitionedTable(client, dbName, tableName);
     try {
       return bench.measure(() ->
@@ -141,10 +139,12 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkListTables(MicroBenchmark bench,
-                                                   HMSClient client,
-                                                   String dbName,
+  static DescriptiveStatistics benchmarkListTables(@NotNull MicroBenchmark bench,
+                                                   @NotNull BenchData data,
                                                    int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+
     // Create a bunch of tables
     String format = "tmp_table_%d";
     try {
@@ -156,10 +156,12 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkCreatePartition(MicroBenchmark bench,
-                                                        final HMSClient client,
-                                                        final String dbName,
-                                                        final String tableName) {
+  static DescriptiveStatistics benchmarkCreatePartition(@NotNull MicroBenchmark bench,
+                                                        @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     final List<String> values = Collections.singletonList("d1");
     try {
@@ -179,10 +181,12 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkListPartition(MicroBenchmark bench,
-                                                      final HMSClient client,
-                                                      final String dbName,
-                                                      final String tableName) {
+  static DescriptiveStatistics benchmarkListPartition(@NotNull MicroBenchmark bench,
+                                                      @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitions(client, dbName, tableName,
@@ -198,11 +202,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkListManyPartitions(MicroBenchmark bench,
-                                                           final HMSClient client,
-                                                           final String dbName,
-                                                           final String tableName,
+  static DescriptiveStatistics benchmarkListManyPartitions(@NotNull MicroBenchmark bench,
+                                                           @NotNull BenchData data,
                                                            int howMany) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
@@ -218,11 +224,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkGetPartitions(final MicroBenchmark bench,
-                                                      final HMSClient client,
-                                                      final String dbName,
-                                                      final String tableName,
+  static DescriptiveStatistics benchmarkGetPartitions(@NotNull MicroBenchmark bench,
+                                                      @NotNull BenchData data,
                                                       int howMany) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
@@ -238,10 +246,12 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkDropPartition(MicroBenchmark bench,
-                                                      final HMSClient client,
-                                                      final String dbName,
-                                                      final String tableName) {
+  static DescriptiveStatistics benchmarkDropPartition(@NotNull MicroBenchmark bench,
+                                                      @NotNull BenchData data) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     final List<String> values = Collections.singletonList("d1");
     try {
@@ -262,11 +272,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkCreatePartitions(MicroBenchmark bench,
-                                                         final HMSClient client,
-                                                         final String dbName,
-                                                         final String tableName,
+  static DescriptiveStatistics benchmarkCreatePartitions(@NotNull MicroBenchmark bench,
+                                                         @NotNull BenchData data,
                                                          int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       return bench.measure(
@@ -281,11 +293,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkDropPartitions(MicroBenchmark bench,
-                                                       final HMSClient client,
-                                                       final String dbName,
-                                                       final String tableName,
+  static DescriptiveStatistics benchmarkDropPartitions(@NotNull MicroBenchmark bench,
+                                                       @NotNull BenchData data,
                                                        int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       return bench.measure(
@@ -300,11 +314,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkGetPartitionNames(MicroBenchmark bench,
-                                                          final HMSClient client,
-                                                          final String dbName,
-                                                          final String tableName,
+  static DescriptiveStatistics benchmarkGetPartitionNames(@NotNull MicroBenchmark bench,
+                                                          @NotNull BenchData data,
                                                           int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitionsNoException(client, dbName, tableName,
@@ -317,11 +333,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkGetPartitionsByName(MicroBenchmark bench,
-                                                            final HMSClient client,
-                                                            final String dbName,
-                                                            final String tableName,
+  static DescriptiveStatistics benchmarkGetPartitionsByName(@NotNull MicroBenchmark bench,
+                                                            @NotNull BenchData data,
                                                             int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitionsNoException(client, dbName, tableName,
@@ -338,11 +356,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkRenameTable(MicroBenchmark bench,
-                                                    final HMSClient client,
-                                                    final String dbName,
-                                                    final String tableName,
+  static DescriptiveStatistics benchmarkRenameTable(@NotNull MicroBenchmark bench,
+                                                    @NotNull BenchData data,
                                                     int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     createPartitionedTable(client, dbName, tableName);
     try {
       addManyPartitionsNoException(client, dbName, tableName,
@@ -369,10 +389,12 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkDropDatabase(MicroBenchmark bench,
-                                                     final HMSClient client,
-                                                     final String dbName,
+  static DescriptiveStatistics benchmarkDropDatabase(@NotNull MicroBenchmark bench,
+                                                     @NotNull BenchData data,
                                                      int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+
     throwingSupplierWrapper(() -> client.dropDatabase(dbName));
     try {
       return bench.measure(
@@ -388,11 +410,13 @@ final class HMSBenchmarks {
     }
   }
 
-  static DescriptiveStatistics benchmarkConcurrentPartitionOps(MicroBenchmark bench,
-                                                               final HMSClient client,
-                                                               final String dbName,
-                                                               final String tableName,
+  static DescriptiveStatistics benchmarkConcurrentPartitionOps(@NotNull MicroBenchmark bench,
+                                                               @NotNull BenchData data,
                                                                int instances, int nThreads) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    String tableName = data.tableName;
+
     ExecutorService executor = newFixedThreadPool(nThreads);
     createPartitionedTable(client, dbName, tableName);
     try {
@@ -434,8 +458,9 @@ final class HMSBenchmarks {
             .build()));
   }
 
-  static DescriptiveStatistics benchmarkGetNotificationId(MicroBenchmark benchmark,
-                                                          final HMSClient client) {
+  static DescriptiveStatistics benchmarkGetNotificationId(@NotNull MicroBenchmark benchmark,
+                                                          @NotNull BenchData data) {
+    HMSClient client = data.getClient();
     return benchmark.measure(() ->
         throwingSupplierWrapper(client::getCurrentNotificationId));
   }
@@ -464,5 +489,4 @@ final class HMSBenchmarks {
       throw new RuntimeException(e);
     }
   }
-
 }
