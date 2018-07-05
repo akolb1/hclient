@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-MAIN=com.akolb.HMSTool
+MAIN=org.apache.hadoop.hive.metastore.tools.HMSTool
 myhome=$(git rev-parse --show-toplevel)
 JAR=hclient-1.0-SNAPSHOT-jar-with-dependencies.jar
 JAR_PATH=${myhome}/target/${JAR}
@@ -24,7 +24,7 @@ if [[ -r ${JAR_PATH} ]]; then
     java -jar ${JAR_PATH} $*
 else
     # Run SentryMain class. Maven takes care of all classpath dependencies.
-    mvn -f ${myhome}/pom.xml exec:java -Dexec.mainClass=${MAIN} \
+    mvn -f ${myhome}/metastore-cli/pom.xml exec:java -Dexec.mainClass=${MAIN} \
       -Dexec.args="$*"
 fi
 
