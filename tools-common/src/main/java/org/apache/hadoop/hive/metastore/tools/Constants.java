@@ -26,6 +26,8 @@ public final class Constants {
   static final String OPT_DATABASE = "database";
   static final String OPT_CONF = "conf";
   static final String OPT_VERBOSE = "verbose";
+  public static final String DEFAULT_HOST = "localhost";
+  public static final int HMS_DEFAULT_PORT = 9083;
 
   // Disable object construction
   private Constants() {}

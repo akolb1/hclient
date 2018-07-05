@@ -57,8 +57,6 @@ public final class Util {
   private static final String DEFAULT_TYPE = "string";
   private static final String TYPE_SEPARATOR = ":";
   private static final String THRIFT_SCHEMA = "thrift";
-  static final String DEFAULT_HOST = "localhost";
-  private static final int DEFAULT_PORT = 9083;
   private static final String ENV_SERVER = "HMS_HOST";
   private static final String ENV_PORT = "HMS_PORT";
   private static final String PROP_HOST = "hms.host";
@@ -199,7 +197,7 @@ public final class Util {
     }
   }
 
-  static class TableBuilder {
+  public static class TableBuilder {
     private final String dbName;
     private final String tableName;
     private TableType tableType = MANAGED_TABLE;
@@ -302,7 +300,7 @@ public final class Util {
     }
   }
 
-  static class PartitionBuilder {
+  public static class PartitionBuilder {
     private final Table table;
     private List<String> values;
     private String location;
@@ -370,7 +368,7 @@ public final class Util {
    *               name:type for non-String types.
    * @return table schema description
    */
-  static List<FieldSchema> createSchema(@Nullable List<String> params) {
+  public static List<FieldSchema> createSchema(@Nullable List<String> params) {
     if (params == null || params.isEmpty()) {
       return Collections.emptyList();
     }
@@ -382,7 +380,6 @@ public final class Util {
 
   /**
    * Get server URI.<p>
-   * <p>
    * HMS host is obtained from
    * <ol>
    * <li>Argument</li>
@@ -402,9 +399,9 @@ public final class Util {
    * @param host       HMS host string.
    * @param portString HMS port
    * @return HMS URI
-   * @throws URISyntaxException
+   * @throws URISyntaxException if URI is is invalid
    */
-  static @Nullable URI getServerUri(@Nullable String host, @Nullable String portString) throws
+  public static @Nullable URI getServerUri(@Nullable String host, @Nullable String portString) throws
       URISyntaxException {
     if (host == null) {
       host = System.getenv(ENV_SERVER);
@@ -413,7 +410,7 @@ public final class Util {
       host = System.getProperty(PROP_HOST);
     }
     if (host == null) {
-      host = DEFAULT_HOST;
+      host = Constants.DEFAULT_HOST;
     }
     if (portString == null && !host.contains(":")) {
       portString = System.getenv(ENV_PORT);
@@ -421,7 +418,7 @@ public final class Util {
         portString = System.getProperty(PROP_PORT);
       }
     }
-    Integer port = DEFAULT_PORT;
+    Integer port = Constants.HMS_DEFAULT_PORT;
     if (portString != null) {
       port = Integer.parseInt(portString);
     }

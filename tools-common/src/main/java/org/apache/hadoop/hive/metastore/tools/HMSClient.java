@@ -86,12 +86,12 @@ public final class HMSClient implements AutoCloseable {
     return serverURI.toString();
   }
 
-  HMSClient(@Nullable URI uri)
+  public HMSClient(@Nullable URI uri)
       throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this(uri, CONFIG_DIR);
   }
 
-  HMSClient(@Nullable URI uri, @Nullable String confDir)
+  public HMSClient(@Nullable URI uri, @Nullable String confDir)
       throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this.confDir = (confDir == null ? CONFIG_DIR : confDir);
     getClient(uri);
@@ -150,15 +150,15 @@ public final class HMSClient implements AutoCloseable {
             () -> open(conf, serverURI));
   }
 
-  boolean dbExists(@NotNull String dbName) throws TException {
+  public boolean dbExists(@NotNull String dbName) throws TException {
     return getAllDatabases(dbName).contains(dbName);
   }
 
-  boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws TException {
+  public boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws TException {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
-  Database getDatabase(@NotNull String dbName) throws TException {
+  public Database getDatabase(@NotNull String dbName) throws TException {
     return client.get_database(dbName);
   }
 
@@ -167,9 +167,9 @@ public final class HMSClient implements AutoCloseable {
    *
    * @param filter Regexp. Can be null or empty in which case everything matches
    * @return list of database names matching the filter
-   * @throws MetaException
+   * @throws TException when the call fails
    */
-  Set<String> getAllDatabases(@Nullable String filter) throws TException {
+  public Set<String> getAllDatabases(@Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.get_all_databases());
     }
@@ -179,7 +179,7 @@ public final class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
-  Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws TException {
+  public Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.get_all_tables(dbName));
     }
@@ -193,8 +193,10 @@ public final class HMSClient implements AutoCloseable {
    * Create database with the given name if it doesn't exist
    *
    * @param name database name
+   * @return True if successfull, false otherwise
+   * @throws TException if the call fails
    */
-  boolean createDatabase(@NotNull String name) throws TException {
+  public boolean createDatabase(@NotNull String name) throws TException {
     return createDatabase(name, null, null, null);
   }
 
@@ -204,9 +206,10 @@ public final class HMSClient implements AutoCloseable {
    * @param description Database description
    * @param location Database location
    * @param params Database params
-   * @throws TException if database exists
+   * @return True if successfull, false otherwise
+   * @throws TException if call fails
    */
-  boolean createDatabase(@NotNull String name,
+  public boolean createDatabase(@NotNull String name,
                       @Nullable String description,
                       @Nullable String location,
                       @Nullable Map<String, String> params)
@@ -216,53 +219,53 @@ public final class HMSClient implements AutoCloseable {
     return true;
   }
 
-  boolean createDatabase(Database db) throws TException {
+  public boolean createDatabase(Database db) throws TException {
     client.create_database(db);
     return true;
   }
 
-  boolean dropDatabase(@NotNull String dbName) throws TException {
+  public boolean dropDatabase(@NotNull String dbName) throws TException {
     client.drop_database(dbName, true, true);
     return true;
   }
 
-  boolean createTable(Table table) throws TException {
+  public boolean createTable(Table table) throws TException {
     client.create_table(table);
     return true;
   }
 
-  boolean dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
+  public boolean dropTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     client.drop_table(dbName, tableName, true);
     return true;
   }
 
-  Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
+  public Table getTable(@NotNull String dbName, @NotNull String tableName) throws TException {
     return client.get_table(dbName, tableName);
   }
 
-  Partition createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
+  public Partition createPartition(@NotNull Table table, @NotNull List<String> values) throws TException {
     return client.add_partition(new Util.PartitionBuilder(table).withValues(values).build());
   }
 
-  Partition addPartition(@NotNull Partition partition) throws TException {
+  public Partition addPartition(@NotNull Partition partition) throws TException {
     return client.add_partition(partition);
   }
 
-  void addPartitions(List<Partition> partitions) throws TException {
+  public void addPartitions(List<Partition> partitions) throws TException {
     client.add_partitions(partitions);
   }
 
 
-  List<Partition> listPartitions(@NotNull String dbName,
+  public List<Partition> listPartitions(@NotNull String dbName,
                                  @NotNull String tableName) throws TException {
     return client.get_partitions(dbName, tableName, (short) -1);
   }
 
-  Long getCurrentNotificationId() throws TException {
+  public Long getCurrentNotificationId() throws TException {
     return client.get_current_notificationEventId().getEventId();
   }
 
-  List<String> getPartitionNames(@NotNull String dbName,
+  public List<String> getPartitionNames(@NotNull String dbName,
                                  @NotNull String tableName) throws TException {
     return client.get_partition_names(dbName, tableName, (short) -1);
   }
@@ -273,11 +276,11 @@ public final class HMSClient implements AutoCloseable {
     return client.drop_partition(dbName, tableName, arguments, true);
   }
 
-  List<Partition> getPartitions(@NotNull String dbName, @NotNull String tableName) throws TException {
+  public List<Partition> getPartitions(@NotNull String dbName, @NotNull String tableName) throws TException {
     return client.get_partitions(dbName, tableName, (short)-1);
   }
 
-  DropPartitionsResult dropPartitions(@NotNull String dbName, @NotNull String tableName,
+  public DropPartitionsResult dropPartitions(@NotNull String dbName, @NotNull String tableName,
                                       @Nullable List<String> partNames) throws TException {
     if (partNames == null) {
       return dropPartitions(dbName, tableName, getPartitionNames(dbName, tableName));
@@ -289,7 +292,7 @@ public final class HMSClient implements AutoCloseable {
         tableName, RequestPartsSpec.names(partNames)));
   }
 
-  List<Partition> getPartitionsByNames(@NotNull String dbName, @NotNull String tableName,
+  public List<Partition> getPartitionsByNames(@NotNull String dbName, @NotNull String tableName,
                                        @Nullable List<String>names) throws TException {
     if (names == null) {
       return client.get_partitions_by_names(dbName, tableName,
@@ -298,23 +301,23 @@ public final class HMSClient implements AutoCloseable {
     return client.get_partitions_by_names(dbName, tableName, names);
   }
 
-  boolean alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
+  public boolean alterTable(@NotNull String dbName, @NotNull String tableName, @NotNull Table newTable)
       throws TException {
     client.alter_table(dbName, tableName, newTable);
     return true;
   }
 
-  void alterPartition(@NotNull String dbName, @NotNull String tableName,
+  public void alterPartition(@NotNull String dbName, @NotNull String tableName,
       @NotNull Partition partition) throws TException {
     client.alter_partition(dbName, tableName, partition);
   }
 
-  void alterPartitions(@NotNull String dbName, @NotNull String tableName,
+  public void alterPartitions(@NotNull String dbName, @NotNull String tableName,
       @NotNull List<Partition> partitions) throws TException {
     client.alter_partitions(dbName, tableName, partitions);
   }
 
-  void appendPartition(@NotNull String dbName, @NotNull String tableName,
+  public void appendPartition(@NotNull String dbName, @NotNull String tableName,
       @NotNull List<String> partitionValues) throws TException {
     client.append_partition_with_environment_context(dbName, tableName, partitionValues, null);
   }
