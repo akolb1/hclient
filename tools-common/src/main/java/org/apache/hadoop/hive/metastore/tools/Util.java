@@ -68,7 +68,7 @@ public final class Util {
   private Util() {}
 
   /**
-   * Wrapper that moves all checked exceptions to RuntimeException
+   * Wrapper that moves all checked exceptions to RuntimeException.
    * @param throwingSupplier Supplier that throws Exception
    * @param <T> Supplier return type
    * @return Supplier that throws unchecked exception
@@ -82,7 +82,7 @@ public final class Util {
   }
 
   /**
-   * Version if the SUpplier that can throw exceptions
+   * Version of the Supplier that can throw exceptions.
    * @param <T> Supplier return type
    * @param <E> Exception type
    */
@@ -300,6 +300,9 @@ public final class Util {
     }
   }
 
+  /**
+   * Builder of partitions.
+   */
   public static class PartitionBuilder {
     private final Table table;
     private List<String> values;
