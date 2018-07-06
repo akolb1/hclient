@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * Consumer can specify number of times the warmup and measurement is repeated.<p>
  * All time is measured in nanoseconds.
  */
-class MicroBenchmark {
+public class MicroBenchmark {
   // Specify defaults
   private static final int WARMUP_DEFAULT = 15;
   private static final int ITERATIONS_DEFAULT = 100;
@@ -56,7 +56,7 @@ class MicroBenchmark {
    * @param warmup number of test calls for warmup
    * @param iterations number of test calls for measurement
    */
-  MicroBenchmark(int warmup, int iterations) {
+  public MicroBenchmark(int warmup, int iterations) {
     this(warmup, iterations, SCALE_DEFAULT);
   }
 

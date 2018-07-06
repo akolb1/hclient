@@ -86,10 +86,10 @@ public final class BenchmarkSuite {
    * When data is reported, all times are divided by scale functor.
    * Data is always collected in nanoseconds, so this can be used to present
    * data using different time units.
-   * @param scale
+   * @param scale: scaling factor
    * @return this for chaining
    */
-  BenchmarkSuite setScale(TimeUnit scale) {
+  public BenchmarkSuite setScale(TimeUnit scale) {
     this.scale = scale;
     return this;
   }
@@ -100,7 +100,7 @@ public final class BenchmarkSuite {
    * @param sanitize enable sanitization if true, disable if false
    * @return this object, allowing chained calls.
    */
-  BenchmarkSuite doSanitize(boolean sanitize) {
+  public BenchmarkSuite doSanitize(boolean sanitize) {
     this.doSanitize = sanitize;
     return this;
   }
