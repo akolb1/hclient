@@ -8,4 +8,6 @@
  
  ## Util
  
+ Common Java libraries used to talk to Hive Metastore.
  
+ See [Documentation](src/apidocs/index.html)
