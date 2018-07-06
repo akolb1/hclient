@@ -20,7 +20,7 @@ All common code lives in [tools-common](tools-common). The code implements its o
 [HiveMetastoreClient](https://hive.apache.org/javadocs/r2.1.1/api/org/apache/hadoop/hive/metastore/HiveMetaStoreClient.html)
  from Hive distribution.
  
-See public [Documentation](tools-common/src/apidocs/index.html).
+See public [Documentation](https://akolb1.github.io/hclient).
 
 ## Installation
 
