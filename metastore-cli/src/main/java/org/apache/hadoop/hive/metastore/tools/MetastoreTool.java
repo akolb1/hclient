@@ -32,7 +32,7 @@ import static picocli.CommandLine.ParentCommand;
 /**
  * Command-line access to Hive Metastore.
  */
-@SuppressWarnings("squid:S106") // Using System.out
+@SuppressWarnings({"squid:S106", "squid:S1148"}) // Using System.out
 @Command(name = "MetastoreTool",
     mixinStandardHelpOptions = true, version = "1.0",
     subcommands = {HelpCommand.class,
@@ -73,7 +73,7 @@ public class MetastoreTool implements Runnable {
     @Option(names = {"-d", "--db"}, description = "Database name pattern")
     private String dbName;
 
-    static void PrintDbList(HMSClient client, String dbName) throws TException {
+    static void printDbList(HMSClient client, String dbName) throws TException {
       client.getAllDatabases(dbName).forEach(System.out::println);
     }
 
@@ -82,7 +82,7 @@ public class MetastoreTool implements Runnable {
       String host = parent.host;
       int port = parent.port;
       try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
-        PrintDbList(client, dbName);
+        printDbList(client, dbName);
       } catch (URISyntaxException e) {
         System.out.println("invalid host " + host);
       } catch (Exception e) {
@@ -107,7 +107,7 @@ public class MetastoreTool implements Runnable {
         int port = parent.parent.port;
         String dbName = parent.dbName;
         try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
-          PrintDbList(client, dbName);
+          printDbList(client, dbName);
         } catch (URISyntaxException e) {
           System.out.println("invalid host " + host);
         } catch (Exception e) {
@@ -152,8 +152,8 @@ public class MetastoreTool implements Runnable {
       @Override
       public void run() {
         String host = parent.parent.host;
-        String dbName = parent.dbName;
         int port = parent.parent.port;
+        String dbName = parent.dbName;
         try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
           printTableList(client, dbName, tableName);
         } catch (URISyntaxException e) {
@@ -166,6 +166,15 @@ public class MetastoreTool implements Runnable {
 
     @Override
     public void run() {
+      String host = parent.host;
+      int port = parent.port;
+      try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
+        printTableList(client, dbName, null);
+      } catch (URISyntaxException e) {
+        System.out.println("invalid host " + host);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
     }
   }
 }
