@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hive.metastore.tools;
 
 import org.apache.thrift.TException;
@@ -23,24 +24,28 @@ import picocli.CommandLine;
 import java.net.URISyntaxException;
 
 import static org.apache.hadoop.hive.metastore.tools.Constants.HMS_DEFAULT_PORT;
+import static picocli.CommandLine.Command;
+import static picocli.CommandLine.HelpCommand;
+import static picocli.CommandLine.Option;
+import static picocli.CommandLine.ParentCommand;
 
 /**
  * Command-line access to Hive Metastore.
  */
 @SuppressWarnings("squid:S106") // Using System.out
-@CommandLine.Command(
-        name = "MetastoreTool",
-        mixinStandardHelpOptions = true, version = "1.0",
-        subcommands = {CommandLine.HelpCommand.class,
-          MetastoreTool.DbCommand.class,
-          MetastoreTool.TableCommand.class},
-        showDefaultValues = true)
+@Command(name = "MetastoreTool",
+    mixinStandardHelpOptions = true, version = "1.0",
+    subcommands = {HelpCommand.class,
+        MetastoreTool.DbCommand.class,
+        MetastoreTool.TableCommand.class},
+    showDefaultValues = true)
+
 public class MetastoreTool implements Runnable {
-  @CommandLine.Option(names = {"-H", "--host"},
+  @Option(names = {"-H", "--host"},
       description = "HMS Host",
       paramLabel = "URI")
   private String host;
-  @CommandLine.Option(names = {"-P", "--port"}, description = "HMS Server port")
+  @Option(names = {"-P", "--port"}, description = "HMS Server port")
   private Integer port = HMS_DEFAULT_PORT;
 
   public static void main(String[] args) {
@@ -58,14 +63,14 @@ public class MetastoreTool implements Runnable {
     }
   }
 
-  @CommandLine.Command(name = "db",
-      subcommands = {CommandLine.HelpCommand.class, DbCommand.DbListCommand.class})
+  @Command(name = "db",
+      subcommands = {HelpCommand.class, DbCommand.DbListCommand.class})
   static class DbCommand implements Runnable {
 
-    @CommandLine.ParentCommand
+    @ParentCommand
     private MetastoreTool parent;
 
-    @CommandLine.Option(names = {"-d", "--db"}, description = "Database name pattern")
+    @Option(names = {"-d", "--db"}, description = "Database name pattern")
     private String dbName;
 
     static void PrintDbList(HMSClient client, String dbName) throws TException {
@@ -88,12 +93,12 @@ public class MetastoreTool implements Runnable {
     /**
      * List databases.
      */
-    @CommandLine.Command(name = "list",
-      description = "List all databases, optionally matching pattern",
-      subcommands = {CommandLine.HelpCommand.class})
+    @Command(name = "list",
+        description = "List all databases, optionally matching pattern",
+        subcommands = {HelpCommand.class})
     static class DbListCommand implements Runnable {
 
-      @CommandLine.ParentCommand
+      @ParentCommand
       private DbCommand parent;
 
       @Override
@@ -112,15 +117,15 @@ public class MetastoreTool implements Runnable {
     }
   }
 
-  @CommandLine.Command(name = "table",
-      subcommands = {CommandLine.HelpCommand.class, TableCommand.TablePrintCommand.class},
+  @Command(name = "table",
+      subcommands = {HelpCommand.class, TableCommand.TablePrintCommand.class},
       description = "HMS Table operations")
   static class TableCommand implements Runnable {
 
-    @CommandLine.ParentCommand
+    @ParentCommand
     private MetastoreTool parent;
 
-    @CommandLine.Option(names = {"-d", "--db"}, description = "Database name pattern")
+    @Option(names = {"-d", "--db"}, description = "Database name pattern")
     private String dbName;
 
     static void printTableList(HMSClient client, String dbName, String tableName) throws TException {
@@ -135,13 +140,13 @@ public class MetastoreTool implements Runnable {
     /**
      * List all tables
      */
-    @CommandLine.Command(name = "list", description = "List all tables")
+    @Command(name = "list", description = "List all tables")
     static class TablePrintCommand implements Runnable {
 
-      @CommandLine.ParentCommand
+      @ParentCommand
       private TableCommand parent;
 
-      @CommandLine.Option(names = {"-t", "--table"}, description = "Table name pattern")
+      @Option(names = {"-t", "--table"}, description = "Table name pattern")
       private String tableName;
 
       @Override
