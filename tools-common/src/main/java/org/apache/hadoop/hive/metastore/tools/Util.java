@@ -415,7 +415,10 @@ public final class Util {
     if (host == null) {
       host = Constants.DEFAULT_HOST;
     }
-    if (portString == null && !host.contains(":")) {
+    host = host.trim();
+
+    if ((portString == null || portString.isEmpty() || portString.equals("0")) &&
+        !host.contains(":")) {
       portString = System.getenv(ENV_PORT);
       if (portString == null) {
         portString = System.getProperty(PROP_PORT);
