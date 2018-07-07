@@ -284,7 +284,7 @@ final class HMSTool {
 
     if (cmd.hasOption(OPT_NUMBER)) {
       int nPartitions = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER));
-      Util.addManyPartitions(client, dbName, tableName, arguments, nPartitions);
+      Util.addManyPartitions(client, dbName, tableName, null, arguments, nPartitions);
     } else {
       addPartition(client, dbName, tableName, arguments);
     }

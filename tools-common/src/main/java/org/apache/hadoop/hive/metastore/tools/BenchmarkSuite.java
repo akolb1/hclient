@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static org.apache.hadoop.hive.metastore.tools.Util.filterMatches;
 
@@ -58,7 +59,7 @@ import static org.apache.hadoop.hive.metastore.tools.Util.filterMatches;
  *           .doSanitize(true)
  *           .add("someBenchmark", someBenchmarkFunc)
  *           .add("anotherBenchmark", anotherBenchmarkFunc)
- *           .runMatching(patterns);
+ *           .runMatching(patterns, exclude);
  *      result.display(fmt);
  * </pre>
  *
@@ -114,16 +115,6 @@ public final class BenchmarkSuite {
   }
 
   /**
-   * List matching benchmarks
-   * @param patterns list of benchmark names or their parts.
-   *                 Adding "!" in front of the name means "exclude".
-   * @return list of matching benchmark names.
-   */
-  public List<String> list(@Nullable List<String> patterns) {
-    return filterMatches(benchmarks, patterns);
-  }
-
-  /**
    * Run all benchmarks in the 'names' list.
    * @param names list of benchmarks to run
    * @return this to allow chaining
@@ -144,17 +135,27 @@ public final class BenchmarkSuite {
   }
 
   /**
-   * Run all benchmarks whose name matches the list of patterns
-   * @param patterns list of string patterns.
-   *                 Patterns prefixed with '!' mean negative match.
-   * @return this.
+   * Return list of benchmark names that match positive patterns and do not
+   * match negative patterns.
+   * @param positive regexp patterns that should match benchmark name
+   * @param negatve regexp patterns that should be excluded when matches
+   * @return list of benchmark names
    */
-  public BenchmarkSuite runMatching(@Nullable List<String> patterns) {
-    return runAll(filterMatches(benchmarks, patterns));
+  public List<String> listMatching(@Nullable Pattern[] positive,
+                                   @Nullable Pattern[] negatve) {
+    return filterMatches(benchmarks, positive, negatve);
   }
 
-  public List<String> listMatching(@Nullable List<String> patterns) {
-    return filterMatches(benchmarks, patterns);
+  /**
+   * Run all benchmarks (filtered by positive and negative matches.
+   * See {@link #listMatching(Pattern[], Pattern[])} for details.
+   * @param positive regexp patterns that should match benchmark name
+   * @param negatve regexp patterns that should be excluded when matches
+   * @return this
+   */
+  public BenchmarkSuite runMatching(@Nullable Pattern[] positive,
+                                    @Nullable Pattern[] negatve) {
+    return runAll(filterMatches(benchmarks, positive, negatve));
   }
 
   /**

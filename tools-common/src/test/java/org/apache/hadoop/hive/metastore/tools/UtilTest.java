@@ -23,6 +23,7 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.apache.hadoop.hive.metastore.tools.Util.filterMatches;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -39,9 +40,9 @@ public class UtilTest {
    */
   @Test
   public void filterMatchesEmpty() {
-    List<String> candidates = ImmutableList.of("a", "b");
-    assertThat(filterMatches(candidates, null), is(candidates));
-    assertThat(filterMatches(null, candidates), is(Collections.emptyList()));
+    List<String> candidates = ImmutableList.of("foo", "bar");
+    assertThat(filterMatches(candidates, null, null), is(candidates));
+    assertThat(filterMatches(null, null, null), is(Collections.emptyList()));
   }
 
   /**
@@ -49,20 +50,21 @@ public class UtilTest {
    */
   @Test
   public void filterMatchesPositive() {
-    List<String> candidates = ImmutableList.of("a", "b");
-    List<String> expected = ImmutableList.of("a");
-    List<String> filtered = filterMatches(candidates, Collections.singletonList("a"));
-    assertThat(filtered, is(expected));
+    List<String> candidates = ImmutableList.of("foo", "bar");
+    List<String> expected = ImmutableList.of("foo");
+    assertThat(filterMatches(candidates, new Pattern[]{Pattern.compile("f.*")}, null),
+            is(expected));
   }
 
   /**
-   * Test matches for negative notation (!something).
+   * Test negative matches
    */
   @Test
   public void filterMatchesNegative() {
     List<String> candidates = ImmutableList.of("a", "b");
     List<String> expected = ImmutableList.of("a");
-    assertThat(filterMatches(candidates, Collections.singletonList("!b")), is(expected));
+    assertThat(filterMatches(candidates, null, new Pattern[]{Pattern.compile("b")}),
+            is(expected));
   }
 
   /**
@@ -73,6 +75,7 @@ public class UtilTest {
     List<String> candidates = ImmutableList.of("a", "b", "any", "boom", "hello");
     List<String> patterns = ImmutableList.of("^a", "!y$");
     List<String> expected = ImmutableList.of("a");
-    assertThat(filterMatches(candidates, patterns), is(expected));
+    assertThat(filterMatches(candidates, new Pattern[]{Pattern.compile("^a")}, new Pattern[]{Pattern.compile("y$")}),
+            is(expected));
   }
 }

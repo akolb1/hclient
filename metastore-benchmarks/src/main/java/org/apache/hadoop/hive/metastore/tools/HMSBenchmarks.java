@@ -187,7 +187,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitions(client, dbName, tableName,
+      addManyPartitions(client, dbName, tableName, null,
           Collections.singletonList("d"), 1);
 
       return bench.measure(() ->
@@ -209,7 +209,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
+      addManyPartitions(client, dbName, tableName, null, Collections.singletonList("d"), howMany);
       LOG.debug("Created {} partitions", howMany);
       LOG.debug("started benchmark... ");
       return bench.measure(() ->
@@ -231,7 +231,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitions(client, dbName, tableName, Collections.singletonList("d"), howMany);
+      addManyPartitions(client, dbName, tableName, null, Collections.singletonList("d"), howMany);
       LOG.debug("Created {} partitions", howMany);
       LOG.debug("started benchmark... ");
       return bench.measure(() ->
@@ -281,7 +281,7 @@ final class HMSBenchmarks {
     try {
       return bench.measure(
           null,
-          () -> addManyPartitionsNoException(client, dbName, tableName,
+          () -> addManyPartitionsNoException(client, dbName, tableName, null,
               Collections.singletonList("d"), count),
           () -> throwingSupplierWrapper(() ->
               client.dropPartitions(dbName, tableName, null))
@@ -301,7 +301,7 @@ final class HMSBenchmarks {
     createPartitionedTable(client, dbName, tableName);
     try {
       return bench.measure(
-          () -> addManyPartitionsNoException(client, dbName, tableName,
+          () -> addManyPartitionsNoException(client, dbName, tableName, null,
               Collections.singletonList("d"), count),
           () -> throwingSupplierWrapper(() ->
               client.dropPartitions(dbName, tableName, null)),
@@ -321,7 +321,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitionsNoException(client, dbName, tableName,
+      addManyPartitionsNoException(client, dbName, tableName, null,
           Collections.singletonList("d"), count);
       return bench.measure(
           () -> throwingSupplierWrapper(() -> client.getPartitionNames(dbName, tableName))
@@ -340,7 +340,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitionsNoException(client, dbName, tableName,
+      addManyPartitionsNoException(client, dbName, tableName, null,
           Collections.singletonList("d"), count);
       List<String> partitionNames = throwingSupplierWrapper(() ->
           client.getPartitionNames(dbName, tableName));
@@ -363,7 +363,7 @@ final class HMSBenchmarks {
 
     createPartitionedTable(client, dbName, tableName);
     try {
-      addManyPartitionsNoException(client, dbName, tableName,
+      addManyPartitionsNoException(client, dbName, tableName, null,
           Collections.singletonList("d"), count);
       Table oldTable = client.getTable(dbName, tableName);
       oldTable.getSd().setLocation("");
@@ -476,7 +476,7 @@ final class HMSBenchmarks {
   }
 
   private static boolean addDropPartitions(URI uri, Table tbl, int instances, int instance) {
-    List<Partition> partitions = Util.createManyPartitions(tbl,
+    List<Partition> partitions = Util.createManyPartitions(tbl, null,
         Collections.singletonList("d"+instance), instances);
     try (HMSClient client = new HMSClient(uri)) {
       client.addPartitions(partitions);

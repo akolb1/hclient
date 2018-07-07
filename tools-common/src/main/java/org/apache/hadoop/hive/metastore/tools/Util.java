@@ -40,10 +40,12 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -62,15 +64,20 @@ public final class Util {
   private static final String PROP_HOST = "hms.host";
   private static final String PROP_PORT = "hms.port";
 
+  private static final Pattern[] EMPTY_PATTERN = new Pattern[]{};
+  private static final Pattern[] MATCH_ALL_PATTERN = new Pattern[]{Pattern.compile(".*")};
+
   private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
   // Disable public constructor
-  private Util() {}
+  private Util() {
+  }
 
   /**
    * Wrapper that moves all checked exceptions to RuntimeException.
+   *
    * @param throwingSupplier Supplier that throws Exception
-   * @param <T> Supplier return type
+   * @param <T>              Supplier return type
    * @return Supplier that throws unchecked exception
    */
   public static <T> T throwingSupplierWrapper(ThrowingSupplier<T, Exception> throwingSupplier) {
@@ -83,6 +90,7 @@ public final class Util {
 
   /**
    * Version of the Supplier that can throw exceptions.
+   *
    * @param <T> Supplier return type
    * @param <E> Exception type
    */
@@ -110,6 +118,7 @@ public final class Util {
 
     /**
      * Constructor from database name.
+     *
      * @param name Database name
      */
     public DatabaseBuilder(@NotNull String name) {
@@ -119,6 +128,7 @@ public final class Util {
 
     /**
      * Add database description.
+     *
      * @param description Database description string.
      * @return this
      */
@@ -129,6 +139,7 @@ public final class Util {
 
     /**
      * Add database location
+     *
      * @param location Database location string
      * @return this
      */
@@ -139,6 +150,7 @@ public final class Util {
 
     /**
      * Add Database parameters
+     *
      * @param params database parameters
      * @return this
      */
@@ -149,6 +161,7 @@ public final class Util {
 
     /**
      * Add a single database parameter.
+     *
      * @param key parameter key
      * @param val parameter value
      * @return this
@@ -163,6 +176,7 @@ public final class Util {
 
     /**
      * Add database owner name
+     *
      * @param ownerName new owner name
      * @return this
      */
@@ -173,6 +187,7 @@ public final class Util {
 
     /**
      * Add owner tyoe
+     *
      * @param ownerType database owner type (USER or GROUP)
      * @return this
      */
@@ -183,6 +198,7 @@ public final class Util {
 
     /**
      * Build database object
+     *
      * @return database
      */
     public Database build() {
@@ -197,6 +213,9 @@ public final class Util {
     }
   }
 
+  /**
+   * Builder for Table.
+   */
   public static class TableBuilder {
     private final String dbName;
     private final String tableName;
@@ -340,15 +359,15 @@ public final class Util {
     Partition build() {
       Partition partition = new Partition();
       List<String> partitionNames = table.getPartitionKeys()
-          .stream()
-          .map(FieldSchema::getName)
-          .collect(Collectors.toList());
+              .stream()
+              .map(FieldSchema::getName)
+              .collect(Collectors.toList());
       if (partitionNames.size() != values.size()) {
         throw new RuntimeException("Partition values do not match table schema");
       }
       List<String> spec = IntStream.range(0, values.size())
-          .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
-          .collect(Collectors.toList());
+              .mapToObj(i -> partitionNames.get(i) + "=" + values.get(i))
+              .collect(Collectors.toList());
 
       partition.setDbName(table.getDbName());
       partition.setTableName(table.getTableName());
@@ -377,8 +396,8 @@ public final class Util {
     }
 
     return params.stream()
-        .map(Util::param2Schema)
-        .collect(Collectors.toList());
+            .map(Util::param2Schema)
+            .collect(Collectors.toList());
   }
 
   /**
@@ -405,7 +424,7 @@ public final class Util {
    * @throws URISyntaxException if URI is is invalid
    */
   public static @Nullable URI getServerUri(@Nullable String host, @Nullable String portString) throws
-      URISyntaxException {
+          URISyntaxException {
     if (host == null) {
       host = System.getenv(ENV_SERVER);
     }
@@ -418,7 +437,7 @@ public final class Util {
     host = host.trim();
 
     if ((portString == null || portString.isEmpty() || portString.equals("0")) &&
-        !host.contains(":")) {
+            !host.contains(":")) {
       portString = System.getenv(ENV_PORT);
       if (portString == null) {
         portString = System.getProperty(PROP_PORT);
@@ -430,12 +449,12 @@ public final class Util {
     }
 
     HostAndPort hp = HostAndPort.fromString(host)
-        .withDefaultPort(port);
+            .withDefaultPort(port);
 
     LOG.info("Connecting to {}:{}", hp.getHostText(), hp.getPort());
 
     return new URI(THRIFT_SCHEMA, null, hp.getHostText(), hp.getPort(),
-        null, null, null);
+            null, null, null);
   }
 
 
@@ -454,60 +473,39 @@ public final class Util {
    * Create multiple partition objects.
    *
    * @param table
-   * @param arguments - list of partition names.
-   * @param npartitions
-   * @return
+   * @param arguments   - list of partition names.
+   * @param npartitions - Partition parameters
+   * @return List of created partitions
    */
   static List<Partition> createManyPartitions(@NotNull Table table,
+                                              @Nullable Map<String, String> parameters,
                                               @NotNull List<String> arguments,
                                               int npartitions) {
     return IntStream.range(0, npartitions)
-        .mapToObj(i ->
-            new PartitionBuilder(table)
-                .withValues(
-                    arguments.stream()
-                        .map(a -> a + i)
-                        .collect(Collectors.toList())).build())
-        .collect(Collectors.toList());
+            .mapToObj(i ->
+                    new PartitionBuilder(table)
+                            .withParameters(parameters)
+                            .withValues(
+                                    arguments.stream()
+                                            .map(a -> a + i)
+                                            .collect(Collectors.toList())).build())
+            .collect(Collectors.toList());
   }
 
   /**
-   * Create multiple partition objects.
+   * Add many partitions in one HMS call
    *
-   * @param table
-   * @param arguments - list of partition names.
-   * @param npartitions
-   * @return
+   * @param client      HMS Client
+   * @param dbName      database name
+   * @param tableName   table name
+   * @param arguments   list of partition names
+   * @param npartitions number of partitions to create
+   * @throws TException if fails to create partitions
    */
-  static List<Partition> createManyPartitions(@NotNull Table table,
-                                              @NotNull Map<String, String> parameters,
-                                              @NotNull List<String> arguments,
-                                              int npartitions) {
-    return IntStream.range(0, npartitions)
-        .mapToObj(i ->
-            new PartitionBuilder(table)
-                .withParameters(parameters)
-                .withValues(
-                    arguments.stream()
-                        .map(a -> a + i)
-                        .collect(Collectors.toList())).build())
-        .collect(Collectors.toList());
-  }
-
   static Object addManyPartitions(@NotNull HMSClient client,
                                   @NotNull String dbName,
                                   @NotNull String tableName,
-                                  @NotNull List<String> arguments,
-                                  int npartitions) throws TException {
-    Table table = client.getTable(dbName, tableName);
-    client.addPartitions(createManyPartitions(table, arguments, npartitions));
-    return null;
-  }
-
-  static Object addManyPartitions(@NotNull HMSClient client,
-                                  @NotNull String dbName,
-                                  @NotNull String tableName,
-                                  @NotNull Map<String, String> parameters,
+                                  @Nullable Map<String, String> parameters,
                                   @NotNull List<String> arguments,
                                   int npartitions) throws TException {
     Table table = client.getTable(dbName, tableName);
@@ -516,55 +514,41 @@ public final class Util {
   }
 
   static List<String> generatePartitionNames(@NotNull String prefix, int npartitions) {
-    return IntStream.range(0, npartitions).mapToObj(i -> prefix+i).collect(Collectors.toList());
+    return IntStream.range(0, npartitions).mapToObj(i -> prefix + i).collect(Collectors.toList());
   }
 
   static void addManyPartitionsNoException(@NotNull HMSClient client,
                                            @NotNull String dbName,
                                            @NotNull String tableName,
+                                           @Nullable Map<String, String> parameters,
                                            List<String> arguments,
                                            int npartitions) {
     throwingSupplierWrapper(() ->
-        addManyPartitions(client, dbName, tableName, arguments, npartitions));
+            addManyPartitions(client, dbName, tableName, parameters, arguments, npartitions));
   }
 
-  static List<String> filterMatches(@Nullable List<String> candidates,
-                                    @Nullable List<String> patterns) {
+  /**
+   * Filter candidates - find all that match positive matches and do not match
+   * any negative matches.
+   *
+   * @param candidates       list of candidate strings. If null, return an empty list.
+   * @param positivePatterns list of regexp that should all match. If null, everything matches.
+   * @param negativePatterns list of regexp, none of these should match. If null, everything matches.
+   * @return list of filtered results.
+   */
+  public static List<String> filterMatches(@Nullable List<String> candidates,
+                                           @Nullable Pattern[] positivePatterns,
+                                           @Nullable Pattern[] negativePatterns) {
     if (candidates == null || candidates.isEmpty()) {
       return Collections.emptyList();
     }
-    if (patterns == null || patterns.isEmpty()) {
-      return candidates;
-    }
-
-    List<String>positive = positivePatterns(patterns);
-    List<String>negative = negativePatterns(patterns);
+    final Pattern[] positive = (positivePatterns == null || positivePatterns.length == 0) ?
+            MATCH_ALL_PATTERN : positivePatterns;
+    final Pattern[] negative = negativePatterns == null ? EMPTY_PATTERN : negativePatterns;
 
     return candidates.stream()
-        .filter(c -> positive.isEmpty() || positive.stream().anyMatch(c::matches))
-        .filter(c -> negative.isEmpty() || negative.stream().noneMatch(c::matches))
-        .collect(Collectors.toList());
+            .filter(c -> Arrays.stream(positive).anyMatch(p -> p.matcher(c).matches()))
+            .filter(c -> Arrays.stream(negative).noneMatch(p -> p.matcher(c).matches()))
+            .collect(Collectors.toList());
   }
-
-  /**
-   * Return list of positive patterns (not starting with bang)
-   * @param patterns
-   * @return
-   */
-  private static List<String> positivePatterns(@NotNull List<@NotNull String> patterns) {
-    return patterns.stream().filter(p -> !p.startsWith("!")).collect(Collectors.toList());
-  }
-
-  /**
-   * Return list of negative patterns (starting with bang
-   * @param patterns
-   * @return
-   */
-  private static List<String> negativePatterns(@NotNull List<@NotNull String> patterns) {
-    return patterns.stream()
-        .filter(p -> p.startsWith("!"))
-        .map(p -> p.substring(1))
-        .collect(Collectors.toList());
-  }
-
 }

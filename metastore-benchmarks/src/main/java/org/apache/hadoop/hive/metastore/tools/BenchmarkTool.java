@@ -18,54 +18,27 @@
 
 package org.apache.hadoop.hive.metastore.tools;
 
-import com.google.common.collect.Lists;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
-import javax.security.auth.login.LoginException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Formatter;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.regex.Pattern;
 
 import static org.apache.hadoop.hive.metastore.tools.Constants.HMS_DEFAULT_PORT;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkConcurrentPartitionOps;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkCreatePartition;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkCreatePartitions;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkDeleteCreate;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkDeleteWithPartitions;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkDropDatabase;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkDropPartition;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkDropPartitions;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkGetNotificationId;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkGetPartitionNames;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkGetPartitions;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkGetPartitionsByName;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkGetTable;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkListAllTables;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkListDatabases;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkListManyPartitions;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkListPartition;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkListTables;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkRenameTable;
-import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkTableCreate;
+import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.*;
 import static org.apache.hadoop.hive.metastore.tools.Util.getServerUri;
 import static picocli.CommandLine.Command;
-import static picocli.CommandLine.HelpCommand;
 import static picocli.CommandLine.Option;
 
 /**
@@ -74,7 +47,6 @@ import static picocli.CommandLine.Option;
 @SuppressWarnings( {"squid:S106", "squid:S1148"}) // Using System.out
 @Command(name = "BenchmarkTool",
     mixinStandardHelpOptions = true, version = "1.0",
-    subcommands = {HelpCommand.class},
     showDefaultValues = true)
 
 public class BenchmarkTool implements Runnable {
@@ -84,19 +56,17 @@ public class BenchmarkTool implements Runnable {
   private static final String TEST_TABLE = "bench_table";
 
 
-  @Option(names = {"-H", "--host"},
-      description = "HMS Host",
-      paramLabel = "URI")
+  @Option(names = {"-H", "--host"}, description = "HMS Host", paramLabel = "URI")
   private String host;
 
   @Option(names = {"-P", "--port"}, description = "HMS Server port")
   private Integer port = HMS_DEFAULT_PORT;
 
-  @Option(names = {"-d", "--db"}, description = "database name", required = true)
-  private String dbName;
+  @Option(names = {"-d", "--db"}, description = "database name")
+  private String dbName = "bench_" + System.getProperty("user.name");
 
   @Option(names = {"-t", "--table"}, description = "table name")
-  private String tableName = TEST_TABLE;
+  private String tableName = TEST_TABLE + "_" + System.getProperty("user.name");
 
 
   @Option(names = {"-N", "--number"}, description = "umber of object instances")
@@ -135,13 +105,11 @@ public class BenchmarkTool implements Runnable {
   @Option(names = {"--separator"}, description = "CSV field separator")
   private String csvSeparator = CSV_SEPARATOR;
 
-  // TODO Convert to Pattern
-  @Option(names = {"-S", "--pattern"}, description = "test patterns")
-  private String testPatterns;
+  @Option(names = {"-M", "--pattern"}, description = "test name patterns")
+  private Pattern[] matches;
 
-
-  @CommandLine.Parameters
-  String[] remainder;
+  @Option(names = {"-E", "--exclude"}, description = "test name patterns to exclude")
+  private Pattern[] exclude;
 
   public static void main(String[] args) {
     CommandLine.run(new BenchmarkTool(), args);
@@ -150,10 +118,10 @@ public class BenchmarkTool implements Runnable {
   static void saveData(Map<String,
       DescriptiveStatistics> result, String location, TimeUnit scale) throws IOException {
     Path dir = Paths.get(location);
-    if (!Files.exists(dir)) {
+    if (!dir.toFile().exists()) {
       LOG.debug("creating directory {}", location);
       Files.createDirectories(dir);
-    } else if (!Files.isDirectory(dir)) {
+    } else if (!dir.toFile().isDirectory()) {
       LOG.error("{} should be a directory", location);
     }
 
@@ -169,31 +137,17 @@ public class BenchmarkTool implements Runnable {
       // Print all values one per line
       Arrays.stream(data.getValues()).forEach(d -> output.println(d / conv));
     } catch (FileNotFoundException e) {
-      LOG.error("failed to write to {}", dst.toString());
+      LOG.error("failed to write to {}", dst);
     }
   }
 
 
   @Override
   public void run() {
-    boolean filtertests = testPatterns != null;
-    List<String> patterns = filtertests ?
-        Lists.newArrayList(testPatterns.split(",")) :
-        Collections.emptyList();
-
-    if (remainder != null) {
-      // If we have arguments, they are filters on the tests, so add them.
-      List<String> arguments = Lists.newArrayList(remainder);
-      if (!arguments.isEmpty()) {
-        patterns = Stream.concat(patterns.stream(), arguments.stream()).collect(Collectors.toList());
-      }
-    }
-
     LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
         " spin " + spinCount + " nparams " + nParameters + " threads " + nThreads);
 
     StringBuilder sb = new StringBuilder();
-    Formatter fmt = new Formatter(sb);
     BenchData bData = new BenchData(dbName, tableName);
 
     MicroBenchmark bench = new MicroBenchmark(warmup, spinCount);
@@ -247,7 +201,7 @@ public class BenchmarkTool implements Runnable {
             () -> benchmarkConcurrentPartitionOps(bench, bData, instances, nThreads));
 
     if (doList) {
-      suite.listMatching((patterns)).forEach(System.out::println);
+      suite.listMatching(matches, exclude).forEach(System.out::println);
       return;
     }
 
@@ -264,8 +218,9 @@ public class BenchmarkTool implements Runnable {
       }
 
       // Arrange various benchmarks in a suite
-      BenchmarkSuite result = suite.runMatching(patterns);
+      BenchmarkSuite result = suite.runMatching(matches, exclude);
 
+      Formatter fmt = new Formatter(sb);
       if (doCSV) {
         result.displayCSV(fmt, csvSeparator);
       } else {
@@ -292,19 +247,8 @@ public class BenchmarkTool implements Runnable {
       if (dataSaveDir != null) {
         saveData(result.getResult(), dataSaveDir, scale);
       }
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (URISyntaxException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    } catch (LoginException e) {
-      e.printStackTrace();
-    } catch (TException e) {
-      e.printStackTrace();
     } catch (Exception e) {
       e.printStackTrace();
     }
-
   }
 }
