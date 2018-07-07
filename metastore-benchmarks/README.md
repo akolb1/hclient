@@ -15,25 +15,43 @@ Alternatively you can use [bin/hbench](../bin/hbench) script which use Maven to 
 
 ## HmsBench usage
 
-     usage: hbench <options> [test]...
-     -conf <arg>             configuration directory
-     -csv                    produce CSV output
-     -d,--database <arg>     database name (can be regexp for list)
-     -H,--host <arg>         HMS Server
-     -h,--help               print this info
-     -K,--separator <arg>    field separator
-     -L,--spin <arg>         spin count
-     -l,--list <arg>         list benchmarks
-     -N,--number <arg>       number of instances
-     -o,--output <arg>       output file
-     -P,--port <arg>         HMS Server port
-     -p,--partitions <arg>   partitions list
-     -S,--pattern <arg>      test patterns
-     -sanitize               sanitize results
-     -savedata <arg>         save raw data in specified dir
-     -T,--threads <arg>      numberOfThreads
-     -v,--verbose            verbose mode
-     -W,--warm <arg>         warmup count
+    Usage: BenchmarkTool [-ChlV] [--sanitize] [--confdir=<confDir>]
+                         [--params=<nParameters>] [--savedata=<dataSaveDir>]
+                         [--separator=<csvSeparator>] -d=<dbName> [-H=URI]
+                         [-L=<spinCount>] [-N=<instances>] [-o=<outputFile>]
+                         [-P=<port>] [-S=<testPatterns>] [-t=<tableName>]
+                         [-T=<nThreads>] [-W=<warmup>] [<remainder>...] [COMMAND]
+          [<remainder>...]
+          --confdir=<confDir>    configuration directory
+          --params=<nParameters> number of table/partition parameters
+                                   Default: 0
+          --sanitize             sanitize results (remove outliers)
+          --savedata=<dataSaveDir>
+                                 save raw data in specified dir
+          --separator=<csvSeparator>
+                                 CSV field separator
+                                   Default:         
+      -C, --csv                  produce CSV output
+      -d, --db=<dbName>          database name
+      -h, --help                 Show this help message and exit.
+      -H, --host=URI             HMS Host
+      -l, --list                 list matching benchmarks
+      -L, --spin=<spinCount>     spin count
+                                   Default: 100
+      -N, --number=<instances>   umber of object instances
+                                   Default: 100
+      -o, --output=<outputFile>  output file
+      -P, --port=<port>          HMS Server port
+                                   Default: 9083
+      -S, --pattern=<testPatterns>
+                                 test patterns
+      -t, --table=<tableName>    table name
+                                   Default: bench_table
+      -T, --threads=<nThreads>   number of concurrent threads
+                                   Default: 2
+      -V, --version              Print version information and exit.
+      -W, --warmup=<warmup>      warmup count
+                                   Default: 15
 
 ### Using single jar
 
