@@ -130,6 +130,8 @@ public final class HMSClient implements AutoCloseable {
         new URI(conf.get(METASTORE_URI).split(",")[0]);
 
     String principal = conf.get(PRINCIPAL_KEY);
+    // TODO fixme
+    // String principal = null;
 
     if (principal == null) {
       open(conf, serverURI);

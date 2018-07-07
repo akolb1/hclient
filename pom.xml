@@ -28,7 +28,7 @@
   </modules>
 
   <properties>
-    <hive.version>2.3.3</hive.version>
+    <hive.version>2.3.0</hive.version>
     <checkstyle.conf.dir>${basedir}/checkstyle</checkstyle.conf.dir>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -87,6 +87,11 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-pmd-plugin</artifactId>
         <version>3.8</version>
+      </dependency>
+      <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>3.1.0</version>
       </dependency>
       <!-- https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-api -->
       <dependency>
