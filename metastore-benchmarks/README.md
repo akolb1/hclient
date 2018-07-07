@@ -63,8 +63,8 @@ Alternatively you can use [bin/hbench](../bin/hbench) script which use Maven to 
 
 1. Run tests with 500 objects created, 10 times warm-up and exclude concurrent operations and drop operations
 
-    java -jar hbench-jar-with-dependencies.jar -H `hostname` -N 500 -W 10 !drop.* !concurrent.*
+    java -jar hbench-jar-with-dependencies.jar -H `hostname` -N 500 -W 10 -E 'drop.*' -E 'concurrent.*'
     
 2. Run tests, produce output in tab-separated format and write individual data points in 'data' directory
   
-    java -jar hbench-jar-with-dependencies.jar -H host.com -o result.csv -csv -savedata data
+    java -jar hbench-jar-with-dependencies.jar -H host.com -o result.csv --csv --savedata data
