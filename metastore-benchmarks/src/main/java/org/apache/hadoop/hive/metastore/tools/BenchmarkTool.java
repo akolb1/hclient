@@ -18,22 +18,18 @@
 
 package org.apache.hadoop.hive.metastore.tools;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
+import javax.security.auth.login.LoginException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -46,11 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.apache.hadoop.hive.metastore.tools.Constants.OPT_CONF;
-import static org.apache.hadoop.hive.metastore.tools.Constants.OPT_DATABASE;
-import static org.apache.hadoop.hive.metastore.tools.Constants.OPT_HOST;
-import static org.apache.hadoop.hive.metastore.tools.Constants.OPT_PORT;
-import static org.apache.hadoop.hive.metastore.tools.Constants.OPT_VERBOSE;
+import static org.apache.hadoop.hive.metastore.tools.Constants.HMS_DEFAULT_PORT;
 import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkConcurrentPartitionOps;
 import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkCreatePartition;
 import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkCreatePartitions;
@@ -72,208 +64,90 @@ import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkList
 import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkRenameTable;
 import static org.apache.hadoop.hive.metastore.tools.HMSBenchmarks.benchmarkTableCreate;
 import static org.apache.hadoop.hive.metastore.tools.Util.getServerUri;
+import static picocli.CommandLine.Command;
+import static picocli.CommandLine.HelpCommand;
+import static picocli.CommandLine.Option;
 
 /**
- * BenchmarkTool is a top-level application for measuring Hive Metastore
- * performance.
+ * Command-line access to Hive Metastore.
  */
-final class BenchmarkTool {
+@SuppressWarnings( {"squid:S106", "squid:S1148"}) // Using System.out
+@Command(name = "BenchmarkTool",
+    mixinStandardHelpOptions = true, version = "1.0",
+    subcommands = {HelpCommand.class},
+    showDefaultValues = true)
+
+public class BenchmarkTool implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(BenchmarkTool.class);
   private static final TimeUnit scale = TimeUnit.MILLISECONDS;
   private static final String CSV_SEPARATOR = "\t";
   private static final String TEST_TABLE = "bench_table";
 
-  private static final String OPT_SEPARATOR = "separator";
-  private static final String OPT_SPIN = "spin";
-  private static final String OPT_WARM = "warm";
-  private static final String OPT_LIST = "list";
-  private static final String OPT_SANITIZE = "sanitize";
-  private static final String OPT_OUTPUT = "output";
-  private static final String OPT_CSV = "csv";
-  private static final String OPT_SAVEDATA = "savedata";
-  private static final String OPT_THREADS = "threads";
-  private static final String OPT_NPARAMS = "params";
-  private static final String OPT_NUMBER = "number";
-  private static final String OPT_PATTERN = "pattern";
+
+  @Option(names = {"-H", "--host"},
+      description = "HMS Host",
+      paramLabel = "URI")
+  private String host;
+
+  @Option(names = {"-P", "--port"}, description = "HMS Server port")
+  private Integer port = HMS_DEFAULT_PORT;
+
+  @Option(names = {"-d", "--db"}, description = "database name", required = true)
+  private String dbName;
+
+  @Option(names = {"-t", "--table"}, description = "table name")
+  private String tableName = TEST_TABLE;
 
 
+  @Option(names = {"-N", "--number"}, description = "umber of object instances")
+  private int instances = 100;
 
-  // There is no need to instantiate BenchmarkTool class.
-  private BenchmarkTool() {}
+  @Option(names = {"-L", "--spin"}, description = "spin count")
+  private int spinCount = 100;
 
-  public static void main(String[] args) throws Exception {
-    Options options = new Options();
-    options.addOption("H", OPT_HOST, true,
-		      "HMS Server (can also be specified with HMS_HOST environment variable)")
-        .addOption("P", OPT_PORT, true, "HMS Server port")
-        .addOption("h", "help", false, "print this info")
-        .addOption("d", OPT_DATABASE, true, "database name (can be regexp for list)")
-        .addOption("v", OPT_VERBOSE, false, "verbose mode")
-        .addOption("N", OPT_NUMBER, true, "number of instances")
-        .addOption("K", OPT_SEPARATOR, true, "field separator")
-        .addOption("L", OPT_SPIN, true, "spin count")
-        .addOption("W", OPT_WARM, true, "warmup count")
-        .addOption("l", OPT_LIST, false, "list benchmarks")
-        .addOption("o", OPT_OUTPUT, true, "output file")
-        .addOption("T", OPT_THREADS, true, "numberOfThreads")
-        .addOption(new Option(OPT_CONF, true, "configuration directory"))
-        .addOption(new Option(OPT_SANITIZE, false, "sanitize results"))
-        .addOption(new Option(OPT_CSV, false, "produce CSV output"))
-        .addOption(new Option(OPT_NPARAMS, true, "number of parameters"))
-        .addOption(new Option(OPT_SAVEDATA, true,
-            "save raw data in specified dir"))
-        .addOption("S", OPT_PATTERN, true, "test patterns");
+  @Option(names = {"-W", "--warmup"}, description = "warmup count")
+  private int warmup = 15;
 
-    CommandLineParser parser = new DefaultParser();
+  @Option(names = {"-l", "--list"}, description = "list matching benchmarks")
+  private boolean doList = false;
 
-    CommandLine cmd = null;
+  @Option(names = {"-o", "--output"}, description = "output file")
+  private String outputFile;
 
-    LOG.info("using args {}", Joiner.on(' ').join(args));
+  @Option(names = {"-T", "--threads"}, description = "number of concurrent threads")
+  private int nThreads = 2;
 
-    try {
-      cmd = parser.parse(options, args);
-    } catch (ParseException e) {
-      help(options);
-    }
+  @Option(names = {"--confdir"}, description = "configuration directory")
+  private String confDir;
 
-    if (cmd.hasOption("help")) {
-      help(options);
-    }
+  @Option(names = {"--sanitize"}, description = "sanitize results (remove outliers)")
+  private boolean doSanitize = false;
 
-    boolean doList = cmd.hasOption(OPT_LIST);
+  @Option(names = {"-C", "--csv"}, description = "produce CSV output")
+  private boolean doCSV = false;
 
-    PrintStream output = System.out;
-    if (cmd.hasOption(OPT_OUTPUT)) {
-      output = new PrintStream(cmd.getOptionValue(OPT_OUTPUT));
-    }
+  @Option(names = {"--params"}, description = "number of table/partition parameters")
+  private int nParameters = 0;
 
-    String dbName = cmd.getOptionValue(OPT_DATABASE);
-    String tableName = TEST_TABLE;
+  @Option(names = {"--savedata"}, description = "save raw data in specified dir")
+  private String dataSaveDir;
 
-    if (!doList && (dbName == null || dbName.isEmpty())) {
-      throw new RuntimeException("Missing DB name");
-    }
+  @Option(names = {"--separator"}, description = "CSV field separator")
+  private String csvSeparator = CSV_SEPARATOR;
 
-    List<String> arguments = cmd.getArgList();
+  // TODO Convert to Pattern
+  @Option(names = {"-S", "--pattern"}, description = "test patterns")
+  private String testPatterns;
 
-    boolean filtertests = cmd.hasOption(OPT_PATTERN);
-    List<String> patterns = filtertests ?
-        Lists.newArrayList(cmd.getOptionValue(OPT_PATTERN).split(",")) :
-        Collections.emptyList();
-    // If we have arguments, they are filters on the tests, so add them.
-    if (!arguments.isEmpty()) {
-      patterns = Stream.concat(patterns.stream(), arguments.stream()).collect(Collectors.toList());
-    }
 
-    int instances = Integer.parseInt(cmd.getOptionValue(OPT_NUMBER, "100"));
-    int nThreads =  Integer.parseInt(cmd.getOptionValue(OPT_THREADS, "2"));
-    int warmup = Integer.parseInt(cmd.getOptionValue(OPT_WARM, "15"));
-    int spin = Integer.parseInt(cmd.getOptionValue(OPT_SPIN, "100"));
-    int nparams = Integer.parseInt(cmd.getOptionValue(OPT_NPARAMS, "1"));
-    LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
-        " spin " + spin + " nparams " + nparams + " threads " + nThreads);
+  @CommandLine.Parameters
+  String[] remainder;
 
-    StringBuilder sb = new StringBuilder();
-    Formatter fmt = new Formatter(sb);
-    BenchData bData = new BenchData(dbName, tableName);
-
-    MicroBenchmark bench = new MicroBenchmark(warmup, spin);
-    BenchmarkSuite suite = new BenchmarkSuite();
-
-    suite
-        .setScale(scale)
-        .doSanitize(cmd.hasOption(OPT_SANITIZE))
-        .add("getNid", () -> benchmarkGetNotificationId(bench, bData))
-        .add("listDatabases", () -> benchmarkListDatabases(bench, bData))
-        .add("listTables", () -> benchmarkListAllTables(bench, bData))
-        .add("listTables" + '.' + instances,
-            () -> benchmarkListTables(bench, bData, instances))
-        .add("getTable", () -> benchmarkGetTable(bench, bData))
-        .add("createTable", () -> benchmarkTableCreate(bench, bData))
-        .add("dropTable", () -> benchmarkDeleteCreate(bench, bData))
-        .add("dropTableWithPartitions",
-            () -> benchmarkDeleteWithPartitions(bench, bData, 1, nparams))
-        .add("dropTableWithPartitions" + '.' + instances,
-            () -> benchmarkDeleteWithPartitions(bench, bData, instances, nparams))
-        .add("addPartition", () -> benchmarkCreatePartition(bench, bData))
-        .add("dropPartition", () -> benchmarkDropPartition(bench, bData))
-        .add("listPartition", () -> benchmarkListPartition(bench, bData))
-        .add("listPartitions" + '.' + instances,
-            () -> benchmarkListManyPartitions(bench, bData,  instances))
-        .add("getPartition",
-            () -> benchmarkGetPartitions(bench, bData,  1))
-        .add("getPartitions" + '.' + instances,
-            () -> benchmarkGetPartitions(bench, bData,  instances))
-        .add("getPartitionNames",
-            () -> benchmarkGetPartitionNames(bench, bData,  1))
-        .add("getPartitionNames" + '.' + instances,
-            () -> benchmarkGetPartitionNames(bench, bData,  instances))
-        .add("getPartitionsByNames",
-            () -> benchmarkGetPartitionsByName(bench, bData,  1))
-        .add("getPartitionsByNames" + '.' + instances,
-            () -> benchmarkGetPartitionsByName(bench, bData,  instances))
-        .add("addPartitions" + '.' + instances,
-            () -> benchmarkCreatePartitions(bench, bData,  instances))
-        .add("dropPartitions" + '.' + instances,
-            () -> benchmarkDropPartitions(bench, bData,  instances))
-        .add("renameTable",
-            () -> benchmarkRenameTable(bench, bData,  1))
-        .add("renameTable" + '.' + instances,
-            () -> benchmarkRenameTable(bench, bData,  instances))
-        .add("dropDatabase",
-            () -> benchmarkDropDatabase(bench, bData, 1))
-        .add("dropDatabase" + '.' + instances,
-            () -> benchmarkDropDatabase(bench, bData, instances))
-        .add("concurrentPartitionAdd" + "#" + nThreads,
-            () -> benchmarkConcurrentPartitionOps(bench, bData,  instances, nThreads));
-
-    if (doList) {
-      suite.listMatching((patterns)).forEach(System.out::println);
-      return;
-    }
-
-    LOG.info("Using table '{}.{}", dbName, tableName);
-
-    try (HMSClient client =
-             new HMSClient(getServerUri(cmd.getOptionValue(OPT_HOST), cmd.getOptionValue(OPT_PORT)),
-                 cmd.getOptionValue(OPT_CONF))) {
-      bData.setClient(client);
-      if (!client.dbExists(dbName)) {
-        client.createDatabase(dbName);
-      }
-
-      if (client.tableExists(dbName, tableName)) {
-        client.dropTable(dbName, tableName);
-      }
-
-      // Arrange various benchmarks in a suite
-      BenchmarkSuite result = suite.runMatching(patterns);
-
-      if (cmd.hasOption(OPT_CSV)) {
-        result.displayCSV(fmt, CSV_SEPARATOR);
-      } else {
-        result.display(fmt);
-      }
-
-      if (cmd.hasOption(OPT_OUTPUT)) {
-        // Print results to stdout as well
-        StringBuilder s = new StringBuilder();
-        Formatter f = new Formatter(s);
-        result.display(f);
-        System.out.print(s);
-        f.close();
-      }
-
-      output.print(sb.toString());
-      fmt.close();
-
-      if (cmd.hasOption(OPT_SAVEDATA)) {
-        saveData(result.getResult(), cmd.getOptionValue(OPT_SAVEDATA), scale);
-      }
-    }
+  public static void main(String[] args) {
+    CommandLine.run(new BenchmarkTool(), args);
   }
 
-  private static void saveData(Map<String,
+  static void saveData(Map<String,
       DescriptiveStatistics> result, String location, TimeUnit scale) throws IOException {
     Path dir = Paths.get(location);
     if (!Files.exists(dir)) {
@@ -297,13 +171,140 @@ final class BenchmarkTool {
     } catch (FileNotFoundException e) {
       LOG.error("failed to write to {}", dst.toString());
     }
-
   }
 
-  private static void help(Options options) {
-    HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("hbench [options] [name] ...", options);
-    System.exit(0);
-  }
 
+  @Override
+  public void run() {
+    boolean filtertests = testPatterns != null;
+    List<String> patterns = filtertests ?
+        Lists.newArrayList(testPatterns.split(",")) :
+        Collections.emptyList();
+
+    if (remainder != null) {
+      // If we have arguments, they are filters on the tests, so add them.
+      List<String> arguments = Lists.newArrayList(remainder);
+      if (!arguments.isEmpty()) {
+        patterns = Stream.concat(patterns.stream(), arguments.stream()).collect(Collectors.toList());
+      }
+    }
+
+    LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
+        " spin " + spinCount + " nparams " + nParameters + " threads " + nThreads);
+
+    StringBuilder sb = new StringBuilder();
+    Formatter fmt = new Formatter(sb);
+    BenchData bData = new BenchData(dbName, tableName);
+
+    MicroBenchmark bench = new MicroBenchmark(warmup, spinCount);
+    BenchmarkSuite suite = new BenchmarkSuite();
+
+    suite
+        .setScale(scale)
+        .doSanitize(doSanitize)
+        .add("getNid", () -> benchmarkGetNotificationId(bench, bData))
+        .add("listDatabases", () -> benchmarkListDatabases(bench, bData))
+        .add("listTables", () -> benchmarkListAllTables(bench, bData))
+        .add("listTables" + '.' + instances,
+            () -> benchmarkListTables(bench, bData, instances))
+        .add("getTable", () -> benchmarkGetTable(bench, bData))
+        .add("createTable", () -> benchmarkTableCreate(bench, bData))
+        .add("dropTable", () -> benchmarkDeleteCreate(bench, bData))
+        .add("dropTableWithPartitions",
+            () -> benchmarkDeleteWithPartitions(bench, bData, 1, nParameters))
+        .add("dropTableWithPartitions" + '.' + instances,
+            () -> benchmarkDeleteWithPartitions(bench, bData, instances, nParameters))
+        .add("addPartition", () -> benchmarkCreatePartition(bench, bData))
+        .add("dropPartition", () -> benchmarkDropPartition(bench, bData))
+        .add("listPartition", () -> benchmarkListPartition(bench, bData))
+        .add("listPartitions" + '.' + instances,
+            () -> benchmarkListManyPartitions(bench, bData, instances))
+        .add("getPartition",
+            () -> benchmarkGetPartitions(bench, bData, 1))
+        .add("getPartitions" + '.' + instances,
+            () -> benchmarkGetPartitions(bench, bData, instances))
+        .add("getPartitionNames",
+            () -> benchmarkGetPartitionNames(bench, bData, 1))
+        .add("getPartitionNames" + '.' + instances,
+            () -> benchmarkGetPartitionNames(bench, bData, instances))
+        .add("getPartitionsByNames",
+            () -> benchmarkGetPartitionsByName(bench, bData, 1))
+        .add("getPartitionsByNames" + '.' + instances,
+            () -> benchmarkGetPartitionsByName(bench, bData, instances))
+        .add("addPartitions" + '.' + instances,
+            () -> benchmarkCreatePartitions(bench, bData, instances))
+        .add("dropPartitions" + '.' + instances,
+            () -> benchmarkDropPartitions(bench, bData, instances))
+        .add("renameTable",
+            () -> benchmarkRenameTable(bench, bData, 1))
+        .add("renameTable" + '.' + instances,
+            () -> benchmarkRenameTable(bench, bData, instances))
+        .add("dropDatabase",
+            () -> benchmarkDropDatabase(bench, bData, 1))
+        .add("dropDatabase" + '.' + instances,
+            () -> benchmarkDropDatabase(bench, bData, instances))
+        .add("concurrentPartitionAdd" + "#" + nThreads,
+            () -> benchmarkConcurrentPartitionOps(bench, bData, instances, nThreads));
+
+    if (doList) {
+      suite.listMatching((patterns)).forEach(System.out::println);
+      return;
+    }
+
+    LOG.info("Using table '{}.{}", dbName, tableName);
+
+    try (HMSClient client = new HMSClient(getServerUri(host, String.valueOf(port)), confDir)) {
+      bData.setClient(client);
+      if (!client.dbExists(dbName)) {
+        client.createDatabase(dbName);
+      }
+
+      if (client.tableExists(dbName, tableName)) {
+        client.dropTable(dbName, tableName);
+      }
+
+      // Arrange various benchmarks in a suite
+      BenchmarkSuite result = suite.runMatching(patterns);
+
+      if (doCSV) {
+        result.displayCSV(fmt, csvSeparator);
+      } else {
+        result.display(fmt);
+      }
+
+      PrintStream output = System.out;
+      if (outputFile != null) {
+        output = new PrintStream(outputFile);
+      }
+
+      if (outputFile != null) {
+        // Print results to stdout as well
+        StringBuilder s = new StringBuilder();
+        Formatter f = new Formatter(s);
+        result.display(f);
+        System.out.print(s);
+        f.close();
+      }
+
+      output.print(sb.toString());
+      fmt.close();
+
+      if (dataSaveDir != null) {
+        saveData(result.getResult(), dataSaveDir, scale);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } catch (LoginException e) {
+      e.printStackTrace();
+    } catch (TException e) {
+      e.printStackTrace();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+  }
 }

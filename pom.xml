@@ -28,7 +28,7 @@
   </modules>
 
   <properties>
-    <hive.version>2.3.3</hive.version>
+    <hive.version>2.3.0</hive.version>
     <checkstyle.conf.dir>${basedir}/checkstyle</checkstyle.conf.dir>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
