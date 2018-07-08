@@ -1,4 +1,4 @@
-# Collection of tools Hive Metastore
+# Collection of tools talking to Hive Metastore over Thrift
 
 ## metastore-cli
 
