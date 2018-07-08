@@ -27,6 +27,7 @@ import picocli.CommandLine;
 
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -116,6 +117,9 @@ public class MetastoreTool implements Runnable {
             description = "List all databases, optionally matching pattern")
     static class DbListCommand implements Runnable {
 
+      @CommandLine.Parameters
+      String[] dbs;
+
       @ParentCommand
       private DbCommand parent;
 
@@ -126,7 +130,16 @@ public class MetastoreTool implements Runnable {
         String dbName = parent.getDbName();
 
         try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
-          printDbList(client, dbName);
+          if (dbs == null || dbs.length == 0) {
+            printDbList(client, dbName);
+            return;
+          }
+          // Get db names from arguments
+          Set<String> dbNames = new HashSet<>();
+          for (String name: dbs) {
+            dbNames.addAll(client.getAllDatabases(name));
+          }
+          dbNames.forEach(System.out::println);
         } catch (URISyntaxException e) {
           System.out.println("invalid host " + host);
         } catch (Exception e) {
@@ -139,6 +152,9 @@ public class MetastoreTool implements Runnable {
             description = "Show all databases, optionally matching pattern")
     static class DbShowCommand implements Runnable {
 
+      @CommandLine.Parameters
+      String[] dbs;
+
       @ParentCommand
       private DbCommand parent;
 
@@ -149,7 +165,16 @@ public class MetastoreTool implements Runnable {
         String dbName = parent.getDbName();
 
         try (HMSClient client = new HMSClient(Util.getServerUri(host, String.valueOf(port)))) {
-          Set<String> dbNames = client.getAllDatabases(dbName);
+          Set<String> dbNames;
+          if (dbs == null || dbs.length == 0) {
+            dbNames = client.getAllDatabases(dbName);
+          } else {
+            // Get db names from args
+            dbNames = new HashSet<>();
+            for (String name: dbs) {
+              dbNames.addAll(client.getAllDatabases(name));
+            }
+          }
           List<Database> databases = new ArrayList<>(dbNames.size());
           for (String name : dbNames) {
             databases.add(client.getDatabase(name));
