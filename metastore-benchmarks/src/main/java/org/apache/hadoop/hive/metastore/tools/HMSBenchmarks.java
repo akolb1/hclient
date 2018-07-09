@@ -419,7 +419,7 @@ final class HMSBenchmarks {
     createPartitionedTable(client, dbName, tableName);
     try {
       Table tbl = throwingSupplierWrapper(() -> client.getTable(dbName, tableName));
-      return bench.measure(() -> executeAddPartitions(client.getServerURI(), executor, tbl,
+      return bench.measure(() -> executeAddPartitions(client, executor, tbl,
           instances, nThreads));
     } finally {
       executor.shutdownNow();
@@ -463,22 +463,22 @@ final class HMSBenchmarks {
         throwingSupplierWrapper(client::getCurrentNotificationId));
   }
 
-  private static void executeAddPartitions(URI uri, ExecutorService executor,
+  private static void executeAddPartitions(HMSClient client, ExecutorService executor,
                                            Table tbl,
                                            int instances, int count) {
     List<Future<Boolean>> results = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       final int j = i;
-      results.add(executor.submit(() -> addDropPartitions(uri, tbl, instances, j)));
+      results.add(executor.submit(() -> addDropPartitions(client, tbl, instances, j)));
     }
     // Wait for results
     results.forEach(r -> throwingSupplierWrapper(r::get));
   }
 
-  private static boolean addDropPartitions(URI uri, Table tbl, int instances, int instance) {
+  private static boolean addDropPartitions(HMSClient c, Table tbl, int instances, int instance) {
     List<Partition> partitions = Util.createManyPartitions(tbl, null,
         Collections.singletonList("d"+instance), instances);
-    try (HMSClient client = new HMSClient(uri)) {
+    try (HMSClient client = c.Clone()) {
       client.addPartitions(partitions);
       client.dropPartitions(tbl.getDbName(), tbl.getTableName(),
           generatePartitionNames("date=d"+instance, instances));

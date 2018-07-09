@@ -70,7 +70,7 @@ public class BenchmarkTool implements Runnable {
 
 
   @Option(names = {"-N", "--number"}, description = "umber of object instances")
-  private int instances = 100;
+  private int[] instances = {100};
 
   @Option(names = {"-L", "--spin"}, description = "spin count")
   private int spinCount = 100;
@@ -159,46 +159,49 @@ public class BenchmarkTool implements Runnable {
         .add("getNid", () -> benchmarkGetNotificationId(bench, bData))
         .add("listDatabases", () -> benchmarkListDatabases(bench, bData))
         .add("listTables", () -> benchmarkListAllTables(bench, bData))
-        .add("listTables" + '.' + instances,
-            () -> benchmarkListTables(bench, bData, instances))
         .add("getTable", () -> benchmarkGetTable(bench, bData))
         .add("createTable", () -> benchmarkTableCreate(bench, bData))
         .add("dropTable", () -> benchmarkDeleteCreate(bench, bData))
         .add("dropTableWithPartitions",
             () -> benchmarkDeleteWithPartitions(bench, bData, 1, nParameters))
-        .add("dropTableWithPartitions" + '.' + instances,
-            () -> benchmarkDeleteWithPartitions(bench, bData, instances, nParameters))
         .add("addPartition", () -> benchmarkCreatePartition(bench, bData))
         .add("dropPartition", () -> benchmarkDropPartition(bench, bData))
         .add("listPartition", () -> benchmarkListPartition(bench, bData))
-        .add("listPartitions" + '.' + instances,
-            () -> benchmarkListManyPartitions(bench, bData, instances))
         .add("getPartition",
             () -> benchmarkGetPartitions(bench, bData, 1))
-        .add("getPartitions" + '.' + instances,
-            () -> benchmarkGetPartitions(bench, bData, instances))
         .add("getPartitionNames",
             () -> benchmarkGetPartitionNames(bench, bData, 1))
-        .add("getPartitionNames" + '.' + instances,
-            () -> benchmarkGetPartitionNames(bench, bData, instances))
         .add("getPartitionsByNames",
             () -> benchmarkGetPartitionsByName(bench, bData, 1))
-        .add("getPartitionsByNames" + '.' + instances,
-            () -> benchmarkGetPartitionsByName(bench, bData, instances))
-        .add("addPartitions" + '.' + instances,
-            () -> benchmarkCreatePartitions(bench, bData, instances))
-        .add("dropPartitions" + '.' + instances,
-            () -> benchmarkDropPartitions(bench, bData, instances))
         .add("renameTable",
             () -> benchmarkRenameTable(bench, bData, 1))
-        .add("renameTable" + '.' + instances,
-            () -> benchmarkRenameTable(bench, bData, instances))
         .add("dropDatabase",
-            () -> benchmarkDropDatabase(bench, bData, 1))
-        .add("dropDatabase" + '.' + instances,
-            () -> benchmarkDropDatabase(bench, bData, instances))
-        .add("concurrentPartitionAdd" + "#" + nThreads,
-            () -> benchmarkConcurrentPartitionOps(bench, bData, instances, nThreads));
+            () -> benchmarkDropDatabase(bench, bData, 1));
+
+    for (int howMany: instances) {
+      suite.add("listTables" + '.' + howMany,
+          () -> benchmarkListTables(bench, bData, howMany))
+          .add("dropTableWithPartitions" + '.' + howMany,
+              () -> benchmarkDeleteWithPartitions(bench, bData, howMany, nParameters))
+          .add("listPartitions" + '.' + howMany,
+              () -> benchmarkListManyPartitions(bench, bData, howMany))
+          .add("getPartitions" + '.' + howMany,
+              () -> benchmarkGetPartitions(bench, bData, howMany))
+          .add("getPartitionNames" + '.' + howMany,
+              () -> benchmarkGetPartitionNames(bench, bData, howMany))
+          .add("getPartitionsByNames" + '.' + howMany,
+              () -> benchmarkGetPartitionsByName(bench, bData, howMany))
+          .add("addPartitions" + '.' + howMany,
+              () -> benchmarkCreatePartitions(bench, bData, howMany))
+          .add("dropPartitions" + '.' + howMany,
+              () -> benchmarkDropPartitions(bench, bData, howMany))
+          .add("renameTable" + '.' + howMany,
+              () -> benchmarkRenameTable(bench, bData, howMany))
+          .add("dropDatabase" + '.' + howMany,
+              () -> benchmarkDropDatabase(bench, bData, howMany))
+          .add("concurrentPartitionAdd" + "#" + nThreads + "." + howMany,
+              () -> benchmarkConcurrentPartitionOps(bench, bData, howMany, nThreads));
+    }
 
     if (doList) {
       suite.listMatching(matches, exclude).forEach(System.out::println);

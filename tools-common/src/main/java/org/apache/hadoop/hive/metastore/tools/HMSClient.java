@@ -86,15 +86,36 @@ public final class HMSClient implements AutoCloseable {
     return serverURI.toString();
   }
 
+  /**
+   * Connect to HMS and return a client instance.
+   * @param uri Hive Metastore URI.
+   */
   public HMSClient(@Nullable URI uri)
       throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this(uri, CONFIG_DIR);
   }
 
+  /**
+   * Connect to HMS and return a client instance.
+   *
+   * @param uri Hive Metastore URI.
+   * @param confDir Directory with Hive configuration files - normally /etc/hive/conf
+   */
   public HMSClient(@Nullable URI uri, @Nullable String confDir)
       throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
     this.confDir = (confDir == null ? CONFIG_DIR : confDir);
     getClient(uri);
+  }
+
+  /**
+   * Return a new connected client using the same configuration as the original client.
+   *
+   * @param client The existing connected client.
+   * @return New connected client instance
+   */
+  public HMSClient Clone()
+      throws InterruptedException, URISyntaxException, TException, LoginException, IOException {
+    return new HMSClient(serverURI, confDir);
   }
 
   private void addResource(Configuration conf, @NotNull String r) throws MalformedURLException {
@@ -152,14 +173,35 @@ public final class HMSClient implements AutoCloseable {
             () -> open(conf, serverURI));
   }
 
+  /**
+   * Return True if given Hive database excists
+   * @param dbName database name
+   * @return True iff dbName exists
+   * @throws TException if there is Thrift error
+   */
   public boolean dbExists(@NotNull String dbName) throws TException {
     return getAllDatabases(dbName).contains(dbName);
   }
 
+  /**
+   * Return True if specified table exists
+   *
+   * @param dbName Database name
+   * @param tableName Table name
+   * @return True iff table exists
+   * @throws TException if there is Thrift error
+   */
   public boolean tableExists(@NotNull String dbName, @NotNull String tableName) throws TException {
     return getAllTables(dbName, tableName).contains(tableName);
   }
 
+  /**
+   * Get full Database information.
+   *
+   * @param dbName Database name.
+   * @return
+   * @throws TException if there is Thrift error
+   */
   public Database getDatabase(@NotNull String dbName) throws TException {
     return client.get_database(dbName);
   }
@@ -181,6 +223,16 @@ public final class HMSClient implements AutoCloseable {
         .collect(Collectors.toSet());
   }
 
+  /**
+   * Get all table names for a database matching the filter.
+   * If filter is null or emoty, return all table names. This call does not use
+   * native HMS table name matching, it uses client-side regexp matching instead.
+   *
+   * @param dbName Database name
+   * @param filter regexp matching table name
+   * @return Set of matching table names or set of all table names
+   * @throws TException if there is Thrift error
+   */
   public Set<String> getAllTables(@NotNull String dbName, @Nullable String filter) throws TException {
     if (filter == null || filter.isEmpty()) {
       return new HashSet<>(client.get_all_tables(dbName));
