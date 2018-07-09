@@ -109,9 +109,12 @@ public final class HMSClient implements AutoCloseable {
 
   /**
    * Return a new connected client using the same configuration as the original client.
-   *
-   * @param client The existing connected client.
    * @return New connected client instance
+   * @throws InterruptedException
+   * @throws URISyntaxException
+   * @throws TException
+   * @throws LoginException
+   * @throws IOException
    */
   public HMSClient Clone()
       throws InterruptedException, URISyntaxException, TException, LoginException, IOException {
