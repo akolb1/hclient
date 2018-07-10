@@ -144,7 +144,7 @@ public class BenchmarkTool implements Runnable {
 
   @Override
   public void run() {
-    LOG.info("Using " + instances + " object instances" + " warmup " + warmup +
+    LOG.info("Using " + " warmup " + warmup +
         " spin " + spinCount + " nparams " + nParameters + " threads " + nThreads);
 
     StringBuilder sb = new StringBuilder();
