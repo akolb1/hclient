@@ -48,10 +48,10 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.7.0</version>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <compilerVersion>${javac.target}</compilerVersion>
+          <source>${javac.target}</source>
+          <target>${javac.target}</target>
           <compilerId>javac-with-errorprone</compilerId>
           <forceJavacCompilerUse>true</forceJavacCompilerUse>
         </configuration>
