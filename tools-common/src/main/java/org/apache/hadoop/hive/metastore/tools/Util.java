@@ -239,56 +239,56 @@ public final class Util {
       this.tableName = tableName;
     }
 
-    static Table buildDefaultTable(String dbName, String tableName) {
+    public static Table buildDefaultTable(String dbName, String tableName) {
       return new TableBuilder(dbName, tableName).build();
     }
 
-    TableBuilder withType(TableType tabeType) {
+    public TableBuilder withType(TableType tabeType) {
       this.tableType = tabeType;
       return this;
     }
 
-    TableBuilder withOwner(String owner) {
+    public TableBuilder withOwner(String owner) {
       this.owner = owner;
       return this;
     }
 
-    TableBuilder withColumns(List<FieldSchema> columns) {
+    public TableBuilder withColumns(List<FieldSchema> columns) {
       this.columns = columns;
       return this;
     }
 
-    TableBuilder withPartitionKeys(List<FieldSchema> partitionKeys) {
+    public TableBuilder withPartitionKeys(List<FieldSchema> partitionKeys) {
       this.partitionKeys = partitionKeys;
       return this;
     }
 
-    TableBuilder withSerde(String serde) {
+    public TableBuilder withSerde(String serde) {
       this.serde = serde;
       return this;
     }
 
-    TableBuilder withInputFormat(String inputFormat) {
+    public TableBuilder withInputFormat(String inputFormat) {
       this.inputFormat = inputFormat;
       return this;
     }
 
-    TableBuilder withOutputFormat(String outputFormat) {
+    public TableBuilder withOutputFormat(String outputFormat) {
       this.outputFormat = outputFormat;
       return this;
     }
 
-    TableBuilder withParameter(String name, String value) {
+    public TableBuilder withParameter(String name, String value) {
       parameters.put(name, value);
       return this;
     }
 
-    TableBuilder withLocation(String location) {
+    public TableBuilder withLocation(String location) {
       this.location = location;
       return this;
     }
 
-    Table build() {
+    public Table build() {
       StorageDescriptor sd = new StorageDescriptor();
       if (columns == null) {
         sd.setCols(Collections.emptyList());
