@@ -195,14 +195,12 @@ public class MetastoreJMHBenchmarks {
     }
   }
 
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  @State(Scope.Thread)
-  public static class benchGetTable extends benchmarkState {
-    private String tableName;
+  static class partitionedTableState extends benchmarkState {
+    String tableName;
 
-    @Setup(Level.Trial)
-    public void setup() throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
-      init();
+    @Override
+    void init() throws InterruptedException, IOException, TException, LoginException, URISyntaxException {
+      super.init();
       tableName = System.getProperty(PROP_TABLE);
       if (tableName == null) {
         tableName = DEFAULT_TABLE_NAME;
@@ -210,13 +208,28 @@ public class MetastoreJMHBenchmarks {
       createPartitionedTable(client, dbName, tableName);
     }
 
-    @TearDown(Level.Trial)
-    public void teardown() {
+    @Override
+    void close() {
       try {
         client.dropTable(dbName, tableName);
       } catch (TException e) {
         e.printStackTrace();
       }
+      super.close();
+    }
+  }
+
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @State(Scope.Thread)
+  public static class benchGetTable extends partitionedTableState {
+
+    @Setup(Level.Trial)
+    public void setup() throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
+      init();
+    }
+
+    @TearDown(Level.Trial)
+    public void teardown() {
       close();
     }
 
