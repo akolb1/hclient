@@ -14,7 +14,7 @@
 -->
 <Configuration status="warn"
                strict="true"
-               name="HMSTools">
+               name="MetastoreJMHBenchmarks">
     <Appenders>    
         <Appender type="Console" name="STDOUT">
             <Layout type="PatternLayout"

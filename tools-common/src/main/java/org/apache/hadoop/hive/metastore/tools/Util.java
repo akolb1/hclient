@@ -234,7 +234,7 @@ public final class Util {
       tableName = null;
     }
 
-    TableBuilder(String dbName, String tableName) {
+    public TableBuilder(String dbName, String tableName) {
       this.dbName = dbName;
       this.tableName = tableName;
     }

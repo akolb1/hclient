@@ -18,13 +18,16 @@
 
 package org.apache.hadoop.hive.metastore.benchmarks;
 
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.tools.HMSClient;
 import org.apache.hadoop.hive.metastore.tools.Util;
 import org.apache.thrift.TException;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
@@ -40,8 +43,12 @@ import org.slf4j.LoggerFactory;
 import javax.security.auth.login.LoginException;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hive.metastore.tools.Util.createSchema;
 import static org.apache.hadoop.hive.metastore.tools.Util.getServerUri;
+import static org.apache.hadoop.hive.metastore.tools.Util.throwingSupplierWrapper;
 
 
 public class MetastoreJMHBenchmarks {
@@ -53,7 +60,15 @@ public class MetastoreJMHBenchmarks {
   private static final String DEFAULT_DB_NAME = "bench_jmh_" + System.getProperty("user.name");
   private static final String DEFAULT_TABLE_NAME = "bench_jmh_table";
 
-
+  // Create a simple table with a single column and single partition
+  private static void createPartitionedTable(HMSClient client, String dbName, String tableName) {
+    throwingSupplierWrapper(() -> client.createTable(
+            new Util.TableBuilder(dbName, tableName)
+                    .withType(TableType.MANAGED_TABLE)
+                    .withColumns(createSchema(Collections.singletonList("name:string")))
+                    .withPartitionKeys(createSchema(Collections.singletonList("date")))
+                    .build()));
+  }
 
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
@@ -93,6 +108,7 @@ public class MetastoreJMHBenchmarks {
     }
   }
 
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
   @State(Scope.Thread)
   public static class benchCreateTable extends benchmarkState {
     private String tableName;
@@ -119,11 +135,13 @@ public class MetastoreJMHBenchmarks {
     }
 
     @Benchmark
+    @BenchmarkMode(Mode.SampleTime)
     public void createTable() throws TException {
       client.createTable(table);
     }
   }
 
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
   @State(Scope.Thread)
   public static class benchDropTable extends benchmarkState {
     private String tableName;
@@ -150,14 +168,15 @@ public class MetastoreJMHBenchmarks {
     }
 
     @Benchmark
+    @BenchmarkMode(Mode.SampleTime)
     public void dropTableTable() throws TException {
       client.dropTable(dbName, tableName);
     }
   }
 
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
   @State(Scope.Thread)
   public static class benchGetEventId extends benchmarkState {
-    private String tableName;
 
     @Setup(Level.Trial)
     public void setup() throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
@@ -170,8 +189,41 @@ public class MetastoreJMHBenchmarks {
     }
 
     @Benchmark
-    public void getCurrentWEventId() throws TException {
+    @BenchmarkMode(Mode.SampleTime)
+    public void getCurrentEventId() throws TException {
       client.getCurrentNotificationId();
+    }
+  }
+
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @State(Scope.Thread)
+  public static class benchGetTable extends benchmarkState {
+    private String tableName;
+
+    @Setup(Level.Trial)
+    public void setup() throws TException, IOException, InterruptedException, LoginException, URISyntaxException {
+      init();
+      tableName = System.getProperty(PROP_TABLE);
+      if (tableName == null) {
+        tableName = DEFAULT_TABLE_NAME;
+      }
+      createPartitionedTable(client, dbName, tableName);
+    }
+
+    @TearDown(Level.Trial)
+    public void teardown() {
+      try {
+        client.dropTable(dbName, tableName);
+      } catch (TException e) {
+        e.printStackTrace();
+      }
+      close();
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.SampleTime)
+    public void getTable() throws TException {
+      client.getTable(dbName, tableName);
     }
   }
 }
