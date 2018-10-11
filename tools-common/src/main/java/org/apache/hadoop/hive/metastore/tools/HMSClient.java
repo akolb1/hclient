@@ -247,6 +247,16 @@ public final class HMSClient implements AutoCloseable {
   }
 
   /**
+   * Get list of tables within a database
+   * @param dbName Database name
+   * @param tableNames All tables of interest
+   */
+  public List<Table> getTableObjects(@NotNull  String dbName, @NotNull List<String> tableNames)
+      throws TException {
+    return client.get_table_objects_by_name(dbName, tableNames);
+  }
+
+  /**
    * Create database with the given name if it doesn't exist
    *
    * @param name database name

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hive.metastore.tools.Util.addManyPartitions;
@@ -425,6 +426,30 @@ final class HMSBenchmarks {
       executor.shutdownNow();
       throwingSupplierWrapper(() -> client.dropTable(dbName, tableName));
     }
+  }
+
+  /**
+   * Measure time for GetTableObjectsByName call
+   */
+  static DescriptiveStatistics benchmarkGetTableObjects(@NotNull MicroBenchmark bench,
+                                                        @NotNull BenchData data,
+                                                        int count) {
+    final HMSClient client = data.getClient();
+    String dbName = data.dbName;
+    // Create a bunch of tables
+    String format = "tmp_table_%d";
+    createManyTables(client, count, dbName, format);
+    // Get List of tables
+    List<String> tableNames = IntStream.range(1, count)
+        .mapToObj(i -> String.format(format, i))
+        .collect(Collectors.toList());
+    try {
+      return bench.measure(() ->
+          throwingSupplierWrapper(() -> client.getTableObjects(dbName, tableNames)));
+    } finally {
+      dropManyTables(client, count, dbName, format);
+    }
+
   }
 
   private static void createManyTables(HMSClient client, int howMany, String dbName, String format) {
