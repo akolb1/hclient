@@ -29,3 +29,16 @@ See public [Documentation](https://akolb1.github.io/hclient).
 You can also create full jars with dependencies by selecting _dist_ profile:
 
     mvn clean install -Pdist
+    
+## Using in Kerberos environment
+
+Use `kinit` to login as user you want to run as:
+
+    kinit -kt /path/tokeytab -l 24h
+
+Make sure you run on a host that has correct HMS configuration in /etc/hive/conf.
+
+
+## Changing logging level
+
+To change the logging level you need to modify file [log4j2.xml](metastore-benchmarks/src/main/resources/log4j2.xml)
